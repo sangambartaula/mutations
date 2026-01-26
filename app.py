@@ -3,16 +3,66 @@ import pandas as pd
 import io
 import json
 import os
+import requests
 import time
 
 # ---------------------------------------------------------
 # 1. CONFIGURATION & MAPPING
 # ---------------------------------------------------------
 USER_DATA_FILE = "user_data.json"
-CACHE_FILE = "max_drops_cache_v2.json" # Changed name to force refresh cache
+CACHE_FILE = "max_drops_cache_v4.json"
 
-# Combined Mushroom Logic
+# Mappings
 MUSHROOM_KEY = "Mushroom" 
+
+# Hypixel Bazaar IDs
+# Mapped based on standard API product IDs.
+MUTATION_IDS = {
+    'All-in Aloe': 'ALL_IN_ALOE',
+    'Ashwreath': 'ASHWREATH',
+    'Blastberry': 'BLASTBERRY',
+    'Cheesebite': 'CHEESEBITE',
+    'Chloronite': 'CHLORONITE',
+    'Chocoberry': 'CHOCOBERRY',
+    'Choconut': 'CHOCONUT',
+    'Chorus Fruit': 'CHORUS_FRUIT',
+    'Cindershade': 'CINDERSHADE',
+    'Coalroot': 'COALROOT',
+    'Creambloom': 'CREAMBLOOM',
+    'Devourer': 'DEVOURER',
+    'Do-not-eat-shroom': 'DO_NOT_EAT_SHROOM',
+    'Duskbloom': 'DUSKBLOOM',
+    'Dustgrain': 'DUSTGRAIN',
+    'Fleshtrap': 'FLESHTRAP',
+    'Glasscorn': 'GLASSCORN',
+    'Gloomgourd': 'GLOOMGOURD',
+    'Godseed': 'GODSEED',
+    'Jerryflower': 'JERRYFLOWER', # Updated
+    'Lonelily': 'LONELILY',
+    'Magic Jellybean': 'MAGIC_JELLYBEAN',
+    'Noctilume': 'NOCTILUME',
+    'Phantomleaf': 'PHANTOMLEAF',
+    'PlantBoy Advance': 'PLANTBOY_ADVANCE',
+    'Puffercloud': 'PUFFERCLOUD',
+    'Scourroot': 'SCOURROOT',
+    'Shadevine': 'SHADEVINE',
+    'Shellfruit': 'SHELLFRUIT',
+    'Snoozling': 'SNOOZLING',
+    'Soggybud': 'SOGGYBUD',
+    'Startlevine': 'STARTLEVINE',
+    'Stoplight Petal': 'STOPLIGHT_PETAL',
+    'Thornshade': 'THORNSHADE',
+    'Thunderling': 'THUNDERLING',
+    'Timestalk': 'TIMESTALK',
+    'Turtlellini': 'TURTLELLINI',
+    'Veilshroom': 'VEILSHROOM',
+    'Witherbloom': 'WITHERBLOOM',
+    'Zombud': 'ZOMBUD',
+    # Ingredients
+    'Fermento': 'FERMENTO',
+    'Dead Bush': 'DEAD_BUSH',
+    'Fire': 'FIRE' 
+}
 
 # Base limits for 1 Plot
 MUTATION_LIMITS_1_PLOT = {
@@ -28,24 +78,91 @@ MUTATION_LIMITS_1_PLOT = {
     'Turtlellini': 16, 'Veilshroom': 52, 'Witherbloom': 16, 'Zombud': 16
 }
 
-# UPDATED Requirements with CLEAN names
-DEFAULT_REQS = {
-    'Wheat': 20_200_000,
-    'Carrot': 66_200_000,
-    'Potato': 66_200_000,
-    'Pumpkin': 20_200_000,
-    'Sugar Cane': 40_400_000,  # Fixed Name
-    'Melon': 105_000_000,      # Fixed Space
-    'Cactus': 40_400_000,
-    'Cocoa Beans': 64_560_000, # Fixed Name
-    'Nether Wart': 20_200_000,
-    'Sunflower': 20_200_000,
-    'Moonflower': 20_200_000,  # Fixed Space
-    'Wild Rose': 40_400_000,
-    MUSHROOM_KEY: 20_200_000
+# NPC Sell Prices (For Cost Calc)
+NPC_PRICES = {
+    'Wheat': 3, 'Carrot': 3, 'Potato': 3, 'Pumpkin': 10, 'Sugar Cane': 4,
+    'Melon': 2, 'Cactus': 4, 'Cocoa Beans': 3, 'Nether Wart': 4,
+    'Sunflower': 20, 'Moonflower': 20, 'Wild Rose': 20, 
+    'Red Mushroom': 10, 'Brown Mushroom': 10,
+    MUSHROOM_KEY: 10
 }
 
-# Raw Data
+# Growth Stages
+GROWTH_STAGES = {
+    'Ashwreath': 0, 'Choconut': 0, 'Dustgrain': 0, 'Gloomgourd': 0, 'Lonelily': 0,
+    'Scourroot': 0, 'Shadevine': 0, 'Veilshroom': 0, 'Witherbloom': 0,
+    'Shellfruit': 0, 'Turtlellini': 0,
+    'Noctilume': 4,
+    'Chocoberry': 6, 'Blastberry': 6,
+    'Thornshade': 8, 'Do-not-eat-shroom': 8, 'Cindershade': 8, 'Coalroot': 8, 'Duskbloom': 8,
+    'Cheesebite': 10, 'Chloronite': 10, 'Soggybud': 10, 'Jerryflower': 10,
+    'Chorus Fruit': 12, 'PlantBoy Advance': 12, 'Startlevine': 12, 'Stoplight Petal': 12,
+    'Fleshtrap': 14, 'Puffercloud': 14, 'Timestalk': 14,
+    'Phantomleaf': 15,
+    'Thunderling': 16, 'Zombud': 16,
+    'Snoozling': 20,
+    'All-in Aloe': 27,
+    'Godseed': 40,
+    'Magic Jellybean': 120,
+    'Creambloom': 6, 
+    'Glasscorn': 9,
+    'Devourer': 16
+}
+
+# Recipes
+RECIPES = {
+    'Ashwreath': {'Nether Wart': 4, 'Fire': 4},
+    'Choconut': {'Cocoa Beans': 4},
+    'Dustgrain': {'Wheat': 4},
+    'Gloomgourd': {'Pumpkin': 1, 'Melon': 1},
+    'Lonelily': {'Adjacent Crops': 0}, 
+    'Scourroot': {'Potato': 2, 'Carrot': 2},
+    'Shadevine': {'Cactus': 2, 'Sugar Cane': 2},
+    'Veilshroom': {'Red Mushroom': 2, 'Brown Mushroom': 2},
+    'Witherbloom': {'Dead Bush': 8},
+    
+    'Chocoberry': {'Choconut': 6, 'Gloomgourd': 2},
+    'Creambloom': {'Choconut': 8},
+    'Cindershade': {'Ashwreath': 4, 'Witherbloom': 4},
+    'Coalroot': {'Ashwreath': 5, 'Scourroot': 3},
+    'Duskbloom': {'Moonflower': 2, 'Shadevine': 2, 'Sunflower': 2, 'Dustgrain': 2},
+    
+    'Thornshade': {'Wild Rose': 4, 'Veilshroom': 4},
+    'Do-not-eat-shroom': {'Veilshroom': 4, 'Scourroot': 4},
+    'Blastberry': {'Chocoberry': 5, 'Ashwreath': 3},
+    'Cheesebite': {'Creambloom': 4, 'Fermento': 4},
+    'Chloronite': {'Coalroot': 6, 'Thornshade': 2},
+    'Fleshtrap': {'Cindershade': 4, 'Lonelily': 4},
+    'Magic Jellybean': {'Sugar Cane': 5, 'Duskbloom': 3},
+    'Noctilume': {'Duskbloom': 6, 'Lonelily': 6},
+    'Snoozling': {'Creambloom': 4, 'Dustgrain': 3, 'Witherbloom': 3, 'Duskbloom': 3, 'Thornshade': 3},
+    'Soggybud': {'Melon': 8},
+    'Chorus Fruit': {'Chloronite': 5, 'Magic Jellybean': 3},
+    'PlantBoy Advance': {'Snoozling': 6, 'Thunderling': 6},
+    'Puffercloud': {'Snoozling': 2, 'Do-not-eat-shroom': 6},
+    'Shellfruit': {'Turtlellini': 1, 'Blastberry': 1}, 
+    'Startlevine': {'Blastberry': 4, 'Cheesebite': 4},
+    'Stoplight Petal': {'Snoozling': 4, 'Noctilume': 4},
+    'Thunderling': {'Soggybud': 5, 'Noctilume': 3},
+    'Turtlellini': {'Soggybud': 4, 'Choconut': 4},
+    'Zombud': {'Dead Bush': 4, 'Cindershade': 2, 'Fleshtrap': 2},
+    'All-in Aloe': {'Magic Jellybean': 6, 'PlantBoy Advance': 2},
+    'Glasscorn': {'Startlevine': 6, 'Chloronite': 6},
+    'Godseed': {'Unique Crops': 12}, 
+    'Jerryflower': {'Jerry Seed': 1},
+    'Phantomleaf': {'Chorus Fruit': 4, 'Shellfruit': 4},
+    'Timestalk': {'Stoplight Petal': 4, 'Chorus Fruit': 2, 'Shellfruit': 2},
+    'Devourer': {'Puffercloud': 4, 'Zombud': 4}
+}
+
+DEFAULT_REQS = {
+    'Wheat': 20_200_000, 'Carrot': 66_200_000, 'Potato': 66_200_000, 'Pumpkin': 20_200_000,
+    'Sugar Cane': 40_400_000, 'Melon': 105_000_000, 'Cactus': 40_400_000,
+    'Cocoa Beans': 64_560_000, 'Nether Wart': 20_200_000, 'Sunflower': 20_200_000,
+    'Moonflower': 20_200_000, 'Wild Rose': 40_400_000, MUSHROOM_KEY: 20_200_000
+}
+
+# CSV Data
 csv_data = """Mutation/Drops,Wheat,Carrot,Potato,Pumpkin,Sugar cane,Melon ,Cactus,Coco Bean,Nether Wart,Sunflower,Moonflower ,Wild Rose,Red Mushroom ,Brown Mushroom
 Ashwreath,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,720.0,0.0,0.0,0.0,0.0,0.0
 Choconut,0.0,0.0,0.0,0.0,0.0,0.0,0.0,400.0,0.0,0.0,0.0,0.0,0.0,0.0
@@ -96,7 +213,7 @@ def format_big_number(num):
     else: return f"{num:,.0f}"
 
 # ---------------------------------------------------------
-# 2. PERSISTENCE & DATA LOADING
+# 2. API & LOGIC
 # ---------------------------------------------------------
 def load_user_data():
     if os.path.exists(USER_DATA_FILE):
@@ -108,304 +225,261 @@ def save_user_data(data):
     with open(USER_DATA_FILE, "w") as f:
         json.dump(data, f)
 
+@st.cache_data(ttl=600) # Cache for 10 minutes
+def get_bazaar_prices():
+    try:
+        url = "https://api.hypixel.net/v2/skyblock/bazaar"
+        response = requests.get(url, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('success'):
+                products = data['products']
+                prices = {}
+                for name, pid in MUTATION_IDS.items():
+                    if pid in products:
+                        # Use quick_status for Instabuy/Instasell
+                        qs = products[pid].get('quick_status', {})
+                        # buyPrice = Sell Offer (Insta Buy Price)
+                        # sellPrice = Buy Offer (Insta Sell Price)
+                        if qs:
+                            prices[name] = {
+                                "buyPrice": qs.get("buyPrice", 0), # Insta Buy
+                                "sellPrice": qs.get("sellPrice", 0) # Insta Sell
+                            }
+                        else:
+                             prices[name] = {"buyPrice": 0, "sellPrice": 0}
+                return prices
+    except Exception as e:
+        pass
+    return {}
+
 def get_processed_data():
     df = pd.read_csv(io.StringIO(csv_data))
-    
-    # 1. Clean Columns: Strip whitespace
     df.columns = df.columns.str.strip()
     
-    # 2. Rename specific columns
-    rename_map = {
-        'Sugar cane': 'Sugar Cane',
-        'Coco Bean': 'Cocoa Beans'
-    }
+    rename_map = {'Sugar cane': 'Sugar Cane', 'Coco Bean': 'Cocoa Beans'}
     df = df.rename(columns=rename_map)
     
-    # 3. Base Limits
     df['Base_Limit'] = df['Mutation/Drops'].map(MUTATION_LIMITS_1_PLOT).fillna(1).astype(int)
     
-    # 4. Clean Numeric Data
     raw_cols = [c for c in df.columns if c not in ['Mutation/Drops', 'Base_Limit', 'Crop Fortune type', 'If u figure it out...']]
     for crop in raw_cols:
         df[crop] = pd.to_numeric(df[crop], errors='coerce').fillna(0)
-        
     return df, raw_cols
 
 df, raw_crop_cols = get_processed_data()
 user_prefs = load_user_data()
+bazaar_data = get_bazaar_prices()
 
 # ---------------------------------------------------------
-# 3. STREAMLIT UI & STYLING
+# 3. STREAMLIT UI
 # ---------------------------------------------------------
 st.set_page_config(page_title="Skyblock Mutation Manager", page_icon="🌱", layout="wide")
 
-# Custom CSS for Animations and Colors
 st.markdown("""
 <style>
-    /* Fade In Animation */
-    @keyframes fadeIn {
-        0% { opacity: 0; transform: translateY(10px); }
-        100% { opacity: 1; transform: translateY(0); }
-    }
-    
-    /* Global Background tweaks (optional, keeps it clean) */
-    .stApp {
-        background: linear-gradient(to bottom right, #ffffff, #f8f9fa);
-    }
-
-    /* Metric Cards */
-    div[data-testid="stMetric"] {
-        background-color: #ffffff;
-        border: 1px solid #e0e0e0;
-        border-radius: 12px;
-        padding: 15px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-        transition: transform 0.2s;
-    }
-    div[data-testid="stMetric"]:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-        border-color: #28a745;
-    }
-
-    /* Highlight Card for Winner */
-    .card-highlight {
-        animation: fadeIn 0.6s ease-out;
-        border-left: 5px solid #28a745;
-        background: linear-gradient(to right, #e8f5e9, #ffffff);
-        padding: 20px;
-        border-radius: 12px;
-        margin-bottom: 20px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-    }
-    
-    .card-title {
-        color: #155724;
-        font-size: 1.5em;
-        font-weight: 700;
-        margin-bottom: 5px;
-    }
-    
-    .card-subtitle {
-        color: #444;
-        font-size: 1.0em;
-        margin-bottom: 10px;
-    }
-
-    .stat-badge {
-        background-color: #c3e6cb;
-        color: #155724;
-        padding: 4px 8px;
-        border-radius: 6px;
-        font-weight: bold;
-        font-size: 0.9em;
-    }
-    
-    /* Toggle Switch Styling override (subtle) */
-    div[data-testid="stMarkdownContainer"] p {
-        font-size: 1.05em;
-    }
+    @keyframes fadeIn { 0% { opacity: 0; transform: translateY(10px); } 100% { opacity: 1; transform: translateY(0); } }
+    div[data-testid="stMetric"] { background-color: #ffffff; border: 1px solid #e0e0e0; border-radius: 12px; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    .card-highlight { animation: fadeIn 0.6s ease-out; border-left: 5px solid #28a745; background: linear-gradient(to right, #e8f5e9, #ffffff); padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+    .card-title { color: #155724; font-size: 1.5em; font-weight: 700; margin-bottom: 5px; }
+    .stat-badge { background-color: #c3e6cb; color: #155724; padding: 4px 8px; border-radius: 6px; font-weight: bold; font-size: 0.9em; }
+    .recipe-row { padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+    .cost-text { color: #666; font-size: 0.9em; font-style: italic; }
 </style>
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# 4. SIDEBAR SETTINGS
+# 4. SIDEBAR
 # ---------------------------------------------------------
 st.sidebar.title("⚙️ Settings")
-
-# Plot Selector
 saved_plots = user_prefs.get("plots", 1)
 plots = st.sidebar.select_slider("Number of Plots", options=[1, 2, 3], value=saved_plots)
-
-# Fortune
 saved_fortune = user_prefs.get("fortune", 2500)
 fortune = st.sidebar.number_input("Farming Fortune", value=saved_fortune, step=50)
 
-# Mode
-saved_mode = user_prefs.get("mode", "Best Overall Value (Smart)")
-mode_options = ["Best Overall Value (Smart)", "Optimize for ONE Crop"]
-mode_index = 0
-if saved_mode in mode_options:
-    mode_index = mode_options.index(saved_mode)
-mode = st.sidebar.radio("Optimization Mode", mode_options, index=mode_index)
-
-# Save Logic
-if fortune != saved_fortune or mode != saved_mode or plots != saved_plots:
-    user_prefs["fortune"] = fortune
-    user_prefs["mode"] = mode
-    user_prefs["plots"] = plots
-    save_user_data(user_prefs)
-
-st.sidebar.markdown(f"**Configuration:**<br>Plots: `{plots}`<br>Fortune: `{fortune}`", unsafe_allow_html=True)
-
 # ---------------------------------------------------------
-# 5. MILESTONE SELECTION
+# 5. TABS
 # ---------------------------------------------------------
-st.title("🏆 Crop Milestones")
-st.markdown("Toggle crops to update your needs. <span style='color:green'>**Green**</span> = Maxed (Ignored). <span style='color:#d9534f'>**Red**</span> = Needed.", unsafe_allow_html=True)
+tab1, tab2 = st.tabs(["📊 Optimizer", "📖 Recipes & Costs"])
 
-# Clean Display List
-display_crops = ['Wheat', 'Carrot', 'Potato', 'Pumpkin', 'Sugar Cane', 'Melon', 'Cactus', 'Cocoa Beans', 'Nether Wart', 'Sunflower', 'Moonflower', 'Wild Rose', MUSHROOM_KEY]
-
-saved_status = user_prefs.get("maxed_crops", {})
-cols = st.columns(4)
-active_reqs = {}
-
-for i, crop in enumerate(display_crops):
-    with cols[i % 4]:
-        is_maxed = saved_status.get(crop, False)
-        # Visual Emoji Logic
-        label = f"✅ {crop}" if is_maxed else f"⚡ {crop}"
-        
-        new_status = st.toggle(label, value=is_maxed, key=f"toggle_{crop}")
-        
-        if new_status != is_maxed:
-            saved_status[crop] = new_status
-            user_prefs["maxed_crops"] = saved_status
-            save_user_data(user_prefs)
-            st.rerun() # Immediate refresh
-            
-        if not new_status:
-            active_reqs[crop] = DEFAULT_REQS.get(crop, 20_200_000)
-
-st.divider()
-
-# ---------------------------------------------------------
-# 6. CALCULATION ENGINE
-# ---------------------------------------------------------
-fixed_mult = 2.16 * 1.3
-fortune_mult = (fortune / 100) + 1
-final_mult = fixed_mult * fortune_mult
-
-results_list = []
-
-# --- MODE 1: OPTIMIZE FOR ONE CROP ---
-if mode == "Optimize for ONE Crop":
-    target = st.selectbox("Select Target Crop", display_crops)
-    best_yield = -1
-    best_mut = None
-    best_limit = 0
+# =========================================================
+# TAB 1: OPTIMIZER
+# =========================================================
+with tab1:
+    st.sidebar.markdown("---")
+    saved_mode = user_prefs.get("mode", "Best Overall Value (Smart)")
+    mode_options = ["Best Overall Value (Smart)", "Optimize for ONE Crop"]
+    mode_index = mode_options.index(saved_mode) if saved_mode in mode_options else 0
+    mode = st.sidebar.radio("Optimization Mode", mode_options, index=mode_index)
     
-    for index, row in df.iterrows():
-        mut_name = row['Mutation/Drops']
-        if mut_name == 'Made by Zigzagbrain': continue
-        
-        limit = row['Base_Limit'] * plots
-        
-        # Handle Mushroom split in DataFrame
-        if target == MUSHROOM_KEY:
-            base_drop = row.get('Red Mushroom', 0) + row.get('Brown Mushroom', 0)
-        else:
-            base_drop = row.get(target, 0)
-             
-        if base_drop > 0:
-            total_yield = base_drop * limit * final_mult
-            if total_yield > best_yield:
-                best_yield = total_yield
-                best_mut = mut_name
-                best_limit = limit
-    
-    if best_mut:
-        st.markdown(f"""
-        <div class="card-highlight">
-            <div class="card-title">🎯 {best_mut}</div>
-            <div class="card-subtitle">Best source for <b>{target}</b></div>
-            <div>Yield: <span class="stat-badge">{format_big_number(best_yield)}</span> items</div>
-            <div>Limit: <b>{best_limit}</b> placed</div>
-        </div>
-        """, unsafe_allow_html=True)
-    else:
-        st.warning("No mutation found for this crop.")
+    # Save settings
+    if fortune != saved_fortune or mode != saved_mode or plots != saved_plots:
+        user_prefs["fortune"] = fortune
+        user_prefs["mode"] = mode
+        user_prefs["plots"] = plots
+        save_user_data(user_prefs)
 
-# --- MODE 2: SMART ALGORITHM (Points + Diversity Bonus) ---
-else:
-    for index, row in df.iterrows():
-        mut_name = row['Mutation/Drops']
-        if mut_name == 'Made by Zigzagbrain': continue
-        
-        limit = row['Base_Limit'] * plots
-        
-        points_sum = 0
-        distinct_crops_hit = 0
-        details = []
-        crops_hit_names = []
-        
-        for crop, req in active_reqs.items():
-            # Get base drop logic
-            base_drop = 0
-            if crop == MUSHROOM_KEY:
-                base_drop = row.get('Red Mushroom', 0) + row.get('Brown Mushroom', 0)
-            else:
-                base_drop = row.get(crop, 0)
-            
+    st.title("🏆 Crop Milestones")
+    st.markdown("Toggle: <span style='color:green'>**Maxed**</span> vs <span style='color:#d9534f'>**Needed**</span>.", unsafe_allow_html=True)
+    display_crops = ['Wheat', 'Carrot', 'Potato', 'Pumpkin', 'Sugar Cane', 'Melon', 'Cactus', 'Cocoa Beans', 'Nether Wart', 'Sunflower', 'Moonflower', 'Wild Rose', MUSHROOM_KEY]
+    saved_status = user_prefs.get("maxed_crops", {})
+    cols = st.columns(4)
+    active_reqs = {}
+    for i, crop in enumerate(display_crops):
+        with cols[i % 4]:
+            is_maxed = saved_status.get(crop, False)
+            new_status = st.toggle(f"{'✅' if is_maxed else '⚡'} {crop}", value=is_maxed, key=f"t_{crop}")
+            if new_status != is_maxed:
+                saved_status[crop] = new_status
+                user_prefs["maxed_crops"] = saved_status
+                save_user_data(user_prefs)
+                st.rerun()
+            if not new_status:
+                active_reqs[crop] = DEFAULT_REQS.get(crop, 20_200_000)
+
+    st.divider()
+    
+    # Calc Logic
+    fixed_mult = 2.16 * 1.3
+    fortune_mult = (fortune / 100) + 1
+    final_mult = fixed_mult * fortune_mult
+    results_list = []
+
+    if mode == "Optimize for ONE Crop":
+        target = st.selectbox("Select Target Crop", display_crops)
+        best_yield = -1
+        best_mut = None
+        best_limit = 0
+        for index, row in df.iterrows():
+            mut_name = row['Mutation/Drops']
+            if mut_name == 'Made by Zigzagbrain': continue
+            limit = row['Base_Limit'] * plots
+            base_drop = (row.get('Red Mushroom', 0) + row.get('Brown Mushroom', 0)) if target == MUSHROOM_KEY else row.get(target, 0)
             if base_drop > 0:
-                distinct_crops_hit += 1
-                crops_hit_names.append(crop)
-                
-                # Yield
                 total_yield = base_drop * limit * final_mult
-                
-                # Points = % of milestone
-                points = (total_yield / req) * 100
-                points_sum += points
-                
-                details.append(f"{crop}: {format_big_number(total_yield)} ({points:.2f}%)")
-        
-        if distinct_crops_hit > 0:
-            # ALGORITHM:
-            # Score = Raw Points * Bonus Multiplier
-            # Bonus = 1.0 + (0.2 * (extra_crops))
-            bonus_mult = 1.0 + (0.2 * (distinct_crops_hit - 1))
-            final_score = points_sum * bonus_mult
-            
-            results_list.append({
-                "name": mut_name,
-                "score": final_score,
-                "raw_pts": points_sum,
-                "count": distinct_crops_hit,
-                "bonus": bonus_mult,
-                "limit": limit,
-                "details": details,
-                "crops": crops_hit_names
-            })
-
-    # Sort Results
-    results_list.sort(key=lambda x: x['score'], reverse=True)
-
-    if not active_reqs:
-        st.success("🎉 You have maxed everything! Select a manual crop mode if you want to farm for coins.")
-    elif not results_list:
-        st.warning("No mutations found for selected needs.")
+                if total_yield > best_yield:
+                    best_yield = total_yield
+                    best_mut = mut_name
+                    best_limit = limit
+        if best_mut:
+            st.markdown(f"<div class='card-highlight'><div class='card-title'>🎯 {best_mut}</div><div>Yield: <b>{format_big_number(best_yield)}</b> items (Limit: {best_limit})</div></div>", unsafe_allow_html=True)
     else:
-        winner = results_list[0]
+        for index, row in df.iterrows():
+            mut_name = row['Mutation/Drops']
+            if mut_name == 'Made by Zigzagbrain': continue
+            limit = row['Base_Limit'] * plots
+            points_sum, distinct = 0, 0
+            details = []
+            crops_hit = []
+            for crop, req in active_reqs.items():
+                base_drop = (row.get('Red Mushroom', 0) + row.get('Brown Mushroom', 0)) if crop == MUSHROOM_KEY else row.get(crop, 0)
+                if base_drop > 0:
+                    distinct += 1
+                    crops_hit.append(crop)
+                    total = base_drop * limit * final_mult
+                    points = (total / req) * 100
+                    points_sum += points
+                    details.append(f"{crop}: {format_big_number(total)} ({points:.2f}%)")
+            if distinct > 0:
+                score = points_sum * (1.0 + (0.2 * (distinct - 1)))
+                results_list.append({"name": mut_name, "score": score, "limit": limit, "count": distinct, "crops": crops_hit, "details": details})
         
-        st.subheader("🥇 Best Recommendation")
+        results_list.sort(key=lambda x: x['score'], reverse=True)
+        if results_list:
+            winner = results_list[0]
+            st.markdown(f"""
+            <div class='card-highlight'>
+                <div class='card-title'>{winner['name']}</div>
+                <div>Covers <b>{winner['count']}</b> crops: {', '.join(winner['crops'])}</div>
+                <div style='margin-top:10px'><span class='stat-badge'>Score: {winner['score']:.2f}</span> <span class='stat-badge'>Limit: {winner['limit']}</span></div>
+            </div>""", unsafe_allow_html=True)
+            d_cols = st.columns(3)
+            for i, d in enumerate(winner['details']): d_cols[i % 3].metric(d.split(":")[0], d.split(":")[1])
+            st.divider()
+            st.write("### 🥈 Top Alternatives")
+            for r in results_list[1:6]:
+                with st.expander(f"{r['name']} (Score: {r['score']:.2f})"):
+                    st.write(f"**Yields:** {', '.join(r['details'])}")
+
+# =========================================================
+# TAB 2: RECIPES & COSTS
+# =========================================================
+with tab2:
+    st.header("📖 Mutation Recipes & Setup Costs")
+    st.markdown("Costs calculated using **NPC Sell Prices** for common crops and **Bazaar Buy Orders** for rare items.")
+    
+    col_r1, col_r2 = st.columns([1, 2])
+    with col_r1:
+        selected_recipe_mut = st.selectbox("Select Mutation to view details", sorted(RECIPES.keys()))
         
-        # Pretty Card HTML
+    if selected_recipe_mut:
+        ingredients = RECIPES.get(selected_recipe_mut, {})
+        limit = MUTATION_LIMITS_1_PLOT.get(selected_recipe_mut, 16) * plots
+        growth = GROWTH_STAGES.get(selected_recipe_mut, "?")
+        
+        # --- Current Sell Price (Insta Buy) ---
+        market_data = bazaar_data.get(selected_recipe_mut, {"buyPrice": 0, "sellPrice": 0})
+        # buyPrice = Sell Offer (Price to Insta Buy)
+        # sellPrice = Buy Offer (Price to Insta Sell)
+        current_val = market_data.get('buyPrice', 0)
+        
+        st.subheader(f"{selected_recipe_mut} (Growth Stage: {growth})")
+        if current_val > 0:
+            st.caption(f"Current Bazaar Insta-Buy Price: {current_val:,.1f} coins")
+        
+        # Calculate Costs
+        unit_cost = 0
+        ingredients_display = []
+        
+        for item, qty in ingredients.items():
+            price = 0
+            price_source = ""
+            
+            # Pricing Logic
+            if item == "Fire" or item == "Unique Crops" or item == "Jerry Seed" or item == "Adjacent Crops":
+                price = 0
+            elif item in NPC_PRICES:
+                price = NPC_PRICES[item]
+                price_source = "(NPC)"
+            elif item in bazaar_data:
+                # Use Buy Price (Insta Buy) or Sell Price (Buy Offer)? 
+                # User asked for "Buy Offer" which is usually lower.
+                # The API 'sellPrice' is the 'Buy Offer' price.
+                price = bazaar_data[item].get('sellPrice', 0)
+                price_source = "(Bazaar Buy Offer)"
+            elif item in MUTATION_IDS and item in bazaar_data:
+                # Same logic for mutations
+                price = bazaar_data[item].get('sellPrice', 0)
+                price_source = "(Bazaar Buy Offer)"
+            
+            item_total = price * qty
+            unit_cost += item_total
+            
+            price_str = f"{item_total:,.0f} coins" if price > 0 else "Free/Hidden"
+            ingredients_display.append(f"**{qty}x {item}** <span class='cost-text'>{price_str}</span>")
+
+        total_setup_cost = unit_cost * limit
+        
+        # Display Card
         st.markdown(f"""
-        <div class="card-highlight">
-            <div class="card-title">{winner['name']}</div>
-            <div class="card-subtitle">
-                Targets <b>{winner['count']}</b> needed crops: {', '.join(winner['crops'])}
-            </div>
-            <div style="display:flex; gap:15px; margin-top:10px;">
-                <span class="stat-badge">Limit: {winner['limit']}</span>
-                <span class="stat-badge">Score: {winner['score']:.2f}</span>
-                <span class="stat-badge">Bonus: {winner['bonus']}x</span>
+        <div style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #ddd;">
+            <h4>Ingredients (Per 1 Mutation)</h4>
+            <ul>{''.join([f'<li>{x}</li>' for x in ingredients_display])}</ul>
+            <hr>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <b>Unit Cost:</b> {unit_cost:,.0f} coins<br>
+                    <small>For 1 setup</small>
+                </div>
+                <div style="text-align:right;">
+                    <b style="color:#d9534f; font-size:1.2em;">Max Setup Cost: {format_big_number(total_setup_cost)} coins</b><br>
+                    <small>For {limit} placements ({plots} Plots)</small>
+                </div>
             </div>
         </div>
         """, unsafe_allow_html=True)
         
-        # Metrics Grid
-        st.write("**Est. Yields (Per Harvest):**")
-        d_cols = st.columns(3)
-        for i, d in enumerate(winner['details']):
-            d_cols[i % 3].metric(label=d.split(":")[0], value=d.split(":")[1])
-
-        # Alternatives Table
-        st.divider()
-        st.write("### 🥈 Top Alternatives")
-        for r in results_list[1:6]:
-            with st.expander(f"{r['name']} (Score: {r['score']:.2f})"):
-                st.write(f"**Crops ({r['count']}):** {', '.join(r['crops'])}")
-                st.write(f"**Yields:** {', '.join(r['details'])}")
+        if selected_recipe_mut == "Godseed":
+            st.info("ℹ️ Godseed requires 12 unique crops surrounding it. The cost shown is 0 because crop inputs vary.")
+        elif selected_recipe_mut == "Shellfruit":
+            st.info("ℹ️ Requires exploding a Turtlellini with a Blastberry.")
