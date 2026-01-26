@@ -224,7 +224,7 @@ def save_user_data(data):
     with open(USER_DATA_FILE, "w") as f:
         json.dump(data, f)
 
-@st.cache_data(ttl=600) # Cache for 10 minutes
+@st.cache_data(ttl=600)
 def get_bazaar_prices():
     try:
         url = "https://api.hypixel.net/v2/skyblock/bazaar"
@@ -239,8 +239,8 @@ def get_bazaar_prices():
                         qs = products[pid].get('quick_status', {})
                         if qs:
                             prices[name] = {
-                                "buyPrice": qs.get("buyPrice", 0), # Sell Offer (Insta Buy Price)
-                                "sellPrice": qs.get("sellPrice", 0) # Buy Offer (Insta Sell Price)
+                                "buyPrice": qs.get("buyPrice", 0), 
+                                "sellPrice": qs.get("sellPrice", 0) 
                             }
                         else:
                              prices[name] = {"buyPrice": 0, "sellPrice": 0}
@@ -411,13 +411,13 @@ with tab2:
         limit = MUTATION_LIMITS_1_PLOT.get(selected_recipe_mut, 16) * plots
         growth = GROWTH_STAGES.get(selected_recipe_mut, "?")
         
-        # Market Data
         market_data = bazaar_data.get(selected_recipe_mut, {"buyPrice": 0, "sellPrice": 0})
-        # buyPrice = Sell Offer (Insta Buy Price), sellPrice = Buy Offer (Insta Sell Price)
+        current_val = market_data.get('buyPrice', 0)
         
         st.subheader(f"{selected_recipe_mut} (Growth Stage: {growth})")
+        if current_val > 0:
+            st.caption(f"Current Bazaar Insta-Buy Price: {current_val:,.1f} coins")
         
-        # --- COST CALCULATION ---
         unit_cost = 0
         ingredients_display = []
         for item, qty in ingredients.items():
@@ -425,50 +425,41 @@ with tab2:
             if item in NPC_PRICES:
                 price = NPC_PRICES[item]
             elif item in bazaar_data:
-                price = bazaar_data[item].get('sellPrice', 0) # Buy Offer
+                price = bazaar_data[item].get('sellPrice', 0)
             elif item in MUTATION_IDS and item in bazaar_data:
-                price = bazaar_data[item].get('sellPrice', 0) # Buy Offer
+                price = bazaar_data[item].get('sellPrice', 0)
             
             item_total = price * qty
             unit_cost += item_total
             price_str = f"{item_total:,.0f} coins" if price > 0 else "Free/Hidden"
-            ingredients_display.append(f"**{qty}x {item}** <span class='cost-text'>{price_str}</span>")
+            # FIX: Use proper HTML tags, NO MARKDOWN
+            ingredients_display.append(f"<b>{qty}x {item}</b> <span class='cost-text'>{price_str}</span>")
         
         total_setup_cost = unit_cost * limit
 
-        # --- ESTIMATED RETURN CALCULATION ---
-        # 1. Crop Returns
+        # --- ESTIMATED RETURN ---
         row = df[df['Mutation/Drops'] == selected_recipe_mut].iloc[0] if not df[df['Mutation/Drops'] == selected_recipe_mut].empty else None
-        
         return_details = []
         total_return_value = 0
         
         if row is not None:
-            # Multiplier from sidebar
             calc_mult = (2.16 * 1.3) * ((fortune / 100) + 1)
-            
-            # Crops
             for crop_col in raw_crop_cols:
                 base_drop = row[crop_col]
                 if base_drop > 0:
                     total_drops = base_drop * limit * calc_mult
-                    # Crop Value (NPC)
                     crop_price = NPC_PRICES.get(crop_col, 0)
                     if crop_col == "Red Mushroom " or crop_col == "Brown Mushroom": crop_price = 10
-                    
                     val = total_drops * crop_price
                     total_return_value += val
-                    return_details.append(f"{format_big_number(total_drops)} {crop_col} ({format_big_number(val)} coins)")
+                    # FIX: Use proper HTML tags
+                    return_details.append(f"{format_big_number(total_drops)} {crop_col} <span class='cost-text'>({format_big_number(val)} coins)</span>")
         
-        # 2. Mutation Item Return (Assuming you get the item back/harvest it)
-        # Use Bazaar Buy Order Price (Insta Sell) for conservative estimate
         mut_unit_price = market_data.get('sellPrice', 0)
         mut_return_val = limit * mut_unit_price
         total_return_value += mut_return_val
         
-        # --- DISPLAY ---
         col_d1, col_d2 = st.columns(2)
-        
         with col_d1:
             st.markdown(f"""
             <div style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #ddd;">
