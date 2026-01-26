@@ -10,13 +10,12 @@ import time
 # 1. CONFIGURATION & MAPPING
 # ---------------------------------------------------------
 USER_DATA_FILE = "user_data.json"
-CACHE_FILE = "max_drops_cache_v4.json"
+CACHE_FILE = "max_drops_cache_v5.json"
 
 # Mappings
 MUSHROOM_KEY = "Mushroom" 
 
 # Hypixel Bazaar IDs
-# Mapped based on standard API product IDs.
 MUTATION_IDS = {
     'All-in Aloe': 'ALL_IN_ALOE',
     'Ashwreath': 'ASHWREATH',
@@ -37,7 +36,7 @@ MUTATION_IDS = {
     'Glasscorn': 'GLASSCORN',
     'Gloomgourd': 'GLOOMGOURD',
     'Godseed': 'GODSEED',
-    'Jerryflower': 'JERRYFLOWER', # Updated
+    'Jerryflower': 'JERRYFLOWER', 
     'Lonelily': 'LONELILY',
     'Magic Jellybean': 'MAGIC_JELLYBEAN',
     'Noctilume': 'NOCTILUME',
@@ -237,14 +236,11 @@ def get_bazaar_prices():
                 prices = {}
                 for name, pid in MUTATION_IDS.items():
                     if pid in products:
-                        # Use quick_status for Instabuy/Instasell
                         qs = products[pid].get('quick_status', {})
-                        # buyPrice = Sell Offer (Insta Buy Price)
-                        # sellPrice = Buy Offer (Insta Sell Price)
                         if qs:
                             prices[name] = {
-                                "buyPrice": qs.get("buyPrice", 0), # Insta Buy
-                                "sellPrice": qs.get("sellPrice", 0) # Insta Sell
+                                "buyPrice": qs.get("buyPrice", 0), # Sell Offer (Insta Buy Price)
+                                "sellPrice": qs.get("sellPrice", 0) # Buy Offer (Insta Sell Price)
                             }
                         else:
                              prices[name] = {"buyPrice": 0, "sellPrice": 0}
@@ -312,7 +308,6 @@ with tab1:
     mode_index = mode_options.index(saved_mode) if saved_mode in mode_options else 0
     mode = st.sidebar.radio("Optimization Mode", mode_options, index=mode_index)
     
-    # Save settings
     if fortune != saved_fortune or mode != saved_mode or plots != saved_plots:
         user_prefs["fortune"] = fortune
         user_prefs["mode"] = mode
@@ -339,7 +334,6 @@ with tab1:
 
     st.divider()
     
-    # Calc Logic
     fixed_mult = 2.16 * 1.3
     fortune_mult = (fortune / 100) + 1
     final_mult = fixed_mult * fortune_mult
@@ -406,7 +400,7 @@ with tab1:
 # =========================================================
 with tab2:
     st.header("📖 Mutation Recipes & Setup Costs")
-    st.markdown("Costs calculated using **NPC Sell Prices** for common crops and **Bazaar Buy Orders** for rare items.")
+    st.markdown("Costs calculated using **NPC Sell Prices** for common crops and **Bazaar Buy Offers** for rare items.")
     
     col_r1, col_r2 = st.columns([1, 2])
     with col_r1:
@@ -417,69 +411,88 @@ with tab2:
         limit = MUTATION_LIMITS_1_PLOT.get(selected_recipe_mut, 16) * plots
         growth = GROWTH_STAGES.get(selected_recipe_mut, "?")
         
-        # --- Current Sell Price (Insta Buy) ---
+        # Market Data
         market_data = bazaar_data.get(selected_recipe_mut, {"buyPrice": 0, "sellPrice": 0})
-        # buyPrice = Sell Offer (Price to Insta Buy)
-        # sellPrice = Buy Offer (Price to Insta Sell)
-        current_val = market_data.get('buyPrice', 0)
+        # buyPrice = Sell Offer (Insta Buy Price), sellPrice = Buy Offer (Insta Sell Price)
         
         st.subheader(f"{selected_recipe_mut} (Growth Stage: {growth})")
-        if current_val > 0:
-            st.caption(f"Current Bazaar Insta-Buy Price: {current_val:,.1f} coins")
         
-        # Calculate Costs
+        # --- COST CALCULATION ---
         unit_cost = 0
         ingredients_display = []
-        
         for item, qty in ingredients.items():
             price = 0
-            price_source = ""
-            
-            # Pricing Logic
-            if item == "Fire" or item == "Unique Crops" or item == "Jerry Seed" or item == "Adjacent Crops":
-                price = 0
-            elif item in NPC_PRICES:
+            if item in NPC_PRICES:
                 price = NPC_PRICES[item]
-                price_source = "(NPC)"
             elif item in bazaar_data:
-                # Use Buy Price (Insta Buy) or Sell Price (Buy Offer)? 
-                # User asked for "Buy Offer" which is usually lower.
-                # The API 'sellPrice' is the 'Buy Offer' price.
-                price = bazaar_data[item].get('sellPrice', 0)
-                price_source = "(Bazaar Buy Offer)"
+                price = bazaar_data[item].get('sellPrice', 0) # Buy Offer
             elif item in MUTATION_IDS and item in bazaar_data:
-                # Same logic for mutations
-                price = bazaar_data[item].get('sellPrice', 0)
-                price_source = "(Bazaar Buy Offer)"
+                price = bazaar_data[item].get('sellPrice', 0) # Buy Offer
             
             item_total = price * qty
             unit_cost += item_total
-            
             price_str = f"{item_total:,.0f} coins" if price > 0 else "Free/Hidden"
             ingredients_display.append(f"**{qty}x {item}** <span class='cost-text'>{price_str}</span>")
-
+        
         total_setup_cost = unit_cost * limit
+
+        # --- ESTIMATED RETURN CALCULATION ---
+        # 1. Crop Returns
+        row = df[df['Mutation/Drops'] == selected_recipe_mut].iloc[0] if not df[df['Mutation/Drops'] == selected_recipe_mut].empty else None
         
-        # Display Card
-        st.markdown(f"""
-        <div style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #ddd;">
-            <h4>Ingredients (Per 1 Mutation)</h4>
-            <ul>{''.join([f'<li>{x}</li>' for x in ingredients_display])}</ul>
-            <hr>
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <div>
-                    <b>Unit Cost:</b> {unit_cost:,.0f} coins<br>
-                    <small>For 1 setup</small>
-                </div>
-                <div style="text-align:right;">
-                    <b style="color:#d9534f; font-size:1.2em;">Max Setup Cost: {format_big_number(total_setup_cost)} coins</b><br>
-                    <small>For {limit} placements ({plots} Plots)</small>
-                </div>
+        return_details = []
+        total_return_value = 0
+        
+        if row is not None:
+            # Multiplier from sidebar
+            calc_mult = (2.16 * 1.3) * ((fortune / 100) + 1)
+            
+            # Crops
+            for crop_col in raw_crop_cols:
+                base_drop = row[crop_col]
+                if base_drop > 0:
+                    total_drops = base_drop * limit * calc_mult
+                    # Crop Value (NPC)
+                    crop_price = NPC_PRICES.get(crop_col, 0)
+                    if crop_col == "Red Mushroom " or crop_col == "Brown Mushroom": crop_price = 10
+                    
+                    val = total_drops * crop_price
+                    total_return_value += val
+                    return_details.append(f"{format_big_number(total_drops)} {crop_col} ({format_big_number(val)} coins)")
+        
+        # 2. Mutation Item Return (Assuming you get the item back/harvest it)
+        # Use Bazaar Buy Order Price (Insta Sell) for conservative estimate
+        mut_unit_price = market_data.get('sellPrice', 0)
+        mut_return_val = limit * mut_unit_price
+        total_return_value += mut_return_val
+        
+        # --- DISPLAY ---
+        col_d1, col_d2 = st.columns(2)
+        
+        with col_d1:
+            st.markdown(f"""
+            <div style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #ddd;">
+                <h4>🛒 Setup Cost</h4>
+                <ul>{''.join([f'<li>{x}</li>' for x in ingredients_display])}</ul>
+                <hr>
+                <div><b>Unit Cost:</b> {unit_cost:,.0f} coins</div>
+                <div style="margin-top:5px;"><b style="color:#d9534f;">Max Setup Cost: {format_big_number(total_setup_cost)} coins</b></div>
+                <small>For {limit} placements ({plots} Plots)</small>
             </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        if selected_recipe_mut == "Godseed":
-            st.info("ℹ️ Godseed requires 12 unique crops surrounding it. The cost shown is 0 because crop inputs vary.")
-        elif selected_recipe_mut == "Shellfruit":
-            st.info("ℹ️ Requires exploding a Turtlellini with a Blastberry.")
+            """, unsafe_allow_html=True)
+            
+        with col_d2:
+            st.markdown(f"""
+            <div style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #28a745;">
+                <h4 style="color:#155724;">💰 Estimated Return (Per Harvest)</h4>
+                <div style="margin-bottom:10px;">
+                    <b>You get:</b> {limit}x {selected_recipe_mut} <span class='cost-text'>({format_big_number(mut_return_val)} coins)</span>
+                </div>
+                <ul>{''.join([f'<li>{x}</li>' for x in return_details])}</ul>
+                <hr>
+                <div style="font-size:1.2em;"><b>Total Value: {format_big_number(total_return_value)} coins</b></div>
+                <small>With {fortune} Fortune</small>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        st.info(f"**Estimated Profit:** {format_big_number(total_return_value - total_setup_cost)} coins (Return - Cost)")
