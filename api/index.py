@@ -3,7 +3,10 @@ import io
 import math
 from fastapi import FastAPI, Query
 from typing import Dict, Any
-from api.shared_data import RECIPES, NPC_PRICES, get_bazaar_prices, MUTATION_LIMITS_1_PLOT, csv_data
+try:
+    from api.shared_data import RECIPES, NPC_PRICES, get_bazaar_prices, MUTATION_LIMITS_1_PLOT, csv_data
+except ImportError:
+    from shared_data import RECIPES, NPC_PRICES, get_bazaar_prices, MUTATION_LIMITS_1_PLOT, csv_data
 
 app = FastAPI(title="Skyblock Mutations API")
 
