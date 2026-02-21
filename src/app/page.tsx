@@ -135,7 +135,7 @@ export default function Home() {
                 <p className="text-sm text-neutral-500 dark:text-neutral-400">Cycle Time</p>
                 <div className="flex items-center gap-2 mt-1 font-mono text-lg font-medium text-amber-600 dark:text-amber-400">
                   <Clock className="w-5 h-5" />
-                  {data.cycle_time_hours.toFixed(2)}h
+                  {Math.floor(data.cycle_time_hours)}h {Math.round((data.cycle_time_hours - Math.floor(data.cycle_time_hours)) * 60)}m
                 </div>
               </div>
             )}
@@ -169,7 +169,7 @@ export default function Home() {
                     <tr>
                       <th className="px-6 py-4 font-semibold">Rank</th>
                       <th className="px-6 py-4 font-semibold">Mutation Name</th>
-                      <th className="px-6 py-4 font-semibold text-right text-emerald-600 dark:text-emerald-400">Profit / Batch (5d)</th>
+                      <th className="px-6 py-4 font-semibold text-right text-emerald-600 dark:text-emerald-400">Profit / Harvest</th>
                       <th className="px-6 py-4 font-semibold text-right">Profit / Hour</th>
                       <th className="px-6 py-4 font-semibold text-right">Setup Cost</th>
                     </tr>

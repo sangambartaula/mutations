@@ -66,9 +66,11 @@ def get_leaderboard(
                 
                 # Apply special mechanics
                 if mut_name == 'All-in Aloe':
-                    expected_drops = (full_drops * 41.0) * SPAWN_CHANCE
+                    # Reddit Analysis: Expected multiplier per cycle is ~1.8x factoring in reset risks and time to reach stage 13
+                    expected_drops = (full_drops * 1.8) * SPAWN_CHANCE
                 elif mut_name == 'Magic Jellybean':
-                    expected_drops = (full_drops * 10.0) * SPAWN_CHANCE
+                    # Takes 120 stages (120 cycles) to get 10x drops. Average per cycle = 10/120 = 0.083x
+                    expected_drops = (full_drops * (10.0 / 120.0)) * SPAWN_CHANCE
                 else:
                     expected_drops = full_drops * SPAWN_CHANCE
                     
@@ -80,9 +82,14 @@ def get_leaderboard(
         expected_mut_val = limit * market_data.get('sellPrice', 0) * SPAWN_CHANCE
         expected_cycle_value += expected_mut_val
         
-        batch_return = expected_cycle_value * total_cycles_per_batch
-        profit_batch = batch_return - opt_cost
-        profit_hour = profit_batch / BATCH_LIFESPAN_HOURS
+        # Batch = 1 Harvest Cycle
+        # Devourer destroys its ingredients, so setup cost is paid EVERY harvest
+        if mut_name == 'Devourer':
+            profit_batch = expected_cycle_value - opt_cost
+        else:
+            profit_batch = expected_cycle_value 
+            
+        profit_hour = profit_batch / cycle_time_hours
         
         leaderboard_data.append({
             "mutation": mut_name,

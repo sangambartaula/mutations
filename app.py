@@ -600,11 +600,11 @@ with tab2:
                     
                     # Apply special mechanics per crop
                     if selected_recipe_mut == 'All-in Aloe':
-                        # Reddit Analysis: Stage 13 is optimal, providing ~41x multiplier on drops
-                        expected_drops = (full_drops * 41.0) * SPAWN_CHANCE
+                        # Reddit Analysis: Expected multiplier per cycle is ~1.8x factoring in reset risks and time to reach stage 13
+                        expected_drops = (full_drops * 1.8) * SPAWN_CHANCE
                     elif selected_recipe_mut == 'Magic Jellybean':
-                        # Scales 1x per 12 stages up to 120 stages (10x drops at max)
-                        expected_drops = (full_drops * 10.0) * SPAWN_CHANCE
+                        # Takes 120 stages (120 cycles) to get 10x drops. Average per cycle = 10/120 = 0.083x
+                        expected_drops = (full_drops * (10.0 / 120.0)) * SPAWN_CHANCE
                     else:
                         # Standard 25% spawn chance
                         expected_drops = full_drops * SPAWN_CHANCE
@@ -622,10 +622,13 @@ with tab2:
         expected_mut_val = limit * mut_unit_price * SPAWN_CHANCE
         expected_cycle_value += expected_mut_val
         
-        # Batch metrics
-        batch_return_value = expected_cycle_value * total_cycles_per_batch
-        profit_per_batch = batch_return_value - opt_cost
-        profit_per_hour = profit_per_batch / BATCH_LIFESPAN_HOURS
+        # Batch metrics (1 Harvest Cycle)
+        if selected_recipe_mut == 'Devourer':
+            profit_per_batch = expected_cycle_value - opt_cost
+        else:
+            profit_per_batch = expected_cycle_value
+            
+        profit_per_hour = profit_per_batch / cycle_time_hours
         
         col_d1, col_d2 = st.columns(2)
         with col_d1:
@@ -662,14 +665,14 @@ with tab2:
             </div>
             """, unsafe_allow_html=True)
             
-        st.info(f"**Profit / Batch (5 Days):** {format_big_number(profit_per_batch)} coins | **Profit / Hour:** {format_big_number(profit_per_hour)} coins")
+        st.info(f"**Profit / Harvest:** {format_big_number(profit_per_batch)} coins | **Profit / Hour:** {format_big_number(profit_per_hour)} coins")
 
 # =========================================================
 # TAB 3: PROFIT LEADERBOARD
 # =========================================================
 with tab3:
     st.header("🏆 Profit Leaderboard")
-    st.markdown("Sort all mutations by **Profit / Hour** or **Profit / Batch (5 Days)**.")
+    st.markdown("Sort all mutations by **Profit / Hour** or **Profit / Harvest**.")
     
     if st.button("Calculate Leaderboard (Takes a few seconds)"):
         with st.spinner("Crunching numbers..."):
@@ -708,9 +711,9 @@ with tab3:
                         
                         # Apply special mechanics
                         if mut_name == 'All-in Aloe':
-                            expected_drops = (full_drops * 41.0) * SPAWN_CHANCE
+                            expected_drops = (full_drops * 1.8) * SPAWN_CHANCE
                         elif mut_name == 'Magic Jellybean':
-                            expected_drops = (full_drops * 10.0) * SPAWN_CHANCE
+                            expected_drops = (full_drops * (10.0 / 120.0)) * SPAWN_CHANCE
                         else:
                             expected_drops = full_drops * SPAWN_CHANCE
                         crop_price = NPC_PRICES.get(crop_col, 0)
@@ -721,14 +724,17 @@ with tab3:
                 expected_mut_val = limit * market_data.get('sellPrice', 0) * SPAWN_CHANCE
                 expected_cycle_value += expected_mut_val
                 
-                batch_return = expected_cycle_value * total_cycles_per_batch
-                profit_batch = batch_return - opt_cost
-                profit_hour = profit_batch / BATCH_LIFESPAN_HOURS
+                if mut_name == 'Devourer':
+                    profit_batch = expected_cycle_value - opt_cost
+                else:
+                    profit_batch = expected_cycle_value
+                    
+                profit_hour = profit_batch / cycle_time_hours
                 
                 leaderboard_data.append({
                     "Mutation": mut_name,
                     "Profit / Hour": profit_hour,
-                    "Profit / Batch": profit_batch,
+                    "Profit / Harvest": profit_batch,
                     "Setup Cost": opt_cost,
                     "Cycle Time (h)": cycle_time_hours
                 })
@@ -739,7 +745,7 @@ with tab3:
             st.dataframe(
                 ldf.style.format({
                     "Profit / Hour": fm,
-                    "Profit / Batch": fm,
+                    "Profit / Harvest": fm,
                     "Setup Cost": fm,
                     "Cycle Time (h)": "{:.2f}"
                 }),
