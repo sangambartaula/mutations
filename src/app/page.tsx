@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { ModeToggle } from "@/components/mode-toggle";
-import { Coins, Sprout, Clock, Calculator, Loader2, ArrowUpRight } from "lucide-react";
+import { Coins, Sprout, Clock, Calculator, Loader2, ArrowUpRight, AlertTriangle } from "lucide-react";
 
 export default function Home() {
   const [plots, setPlots] = useState(1);
@@ -198,15 +198,38 @@ export default function Home() {
                           {item.mutation === 'All-in Aloe' && (
                             <div className="text-[10px] text-neutral-400 mt-1">Stops at Stage 13-14 optimally</div>
                           )}
+                          {item.mutation === 'Shellfruit' && (
+                            <div className="text-[10px] text-neutral-400 mt-1">Cost assumes 16x Blastberries perfectly</div>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                          {formatCoins(item.profit_per_batch)}
+                          <div className="flex items-center justify-end gap-2">
+                            {item.mut_warning && (
+                              <div className="group relative">
+                                <AlertTriangle className="w-4 h-4 text-yellow-500 hover:text-yellow-600 cursor-help" />
+                                <div className="absolute bottom-full right-0 mb-2 w-48 p-2 bg-neutral-900 text-xs text-white rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 text-center font-sans tracking-wide">
+                                  Insta-Buy is &gt;100% higher than Insta-Sell. Market is manipulated!
+                                </div>
+                              </div>
+                            )}
+                            {formatCoins(item.profit_per_batch)}
+                          </div>
                         </td>
                         <td className="px-6 py-4 text-right font-mono opacity-80">
                           {formatCoins(item.profit_per_hour)}
                         </td>
                         <td className="px-6 py-4 text-right font-mono opacity-[0.65]">
-                          {formatCoins(item.setup_cost)}
+                          <div className="flex items-center justify-end gap-2">
+                            {item.ing_warning && (
+                              <div className="group relative">
+                                <AlertTriangle className="w-4 h-4 text-yellow-500 hover:text-yellow-600 cursor-help" />
+                                <div className="absolute bottom-full right-0 mb-2 w-56 p-2 bg-neutral-900 text-xs text-white rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 text-center font-sans tracking-wide">
+                                  An ingredient's Insta-Buy price is &gt;100% higher than Insta-Sell. Try setting buy orders!
+                                </div>
+                              </div>
+                            )}
+                            {formatCoins(item.setup_cost)}
+                          </div>
                         </td>
                       </tr>
                     ))}

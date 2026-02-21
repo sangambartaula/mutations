@@ -47,33 +47,45 @@ def get_leaderboard(
             elif item in bazaar_data:
                 ing_prices[item] = bazaar_data[item].get('sellPrice', 0)
                 
-        # Run Mathematical Optimizer logic
-        opt_counts = compute_optimized_plot_cost(mut_name, tuple(sorted(ing_prices.items())))
+        # Fetch Prices and Implement Spread Warnings
+        market_data = bazaar_data.get(mut_name, {"buyPrice": 0, "sellPrice": 0})
+        mut_sell_price = market_data.get('sellPrice', 0)
+        mut_buy_price = market_data.get('buyPrice', 0)
+        
+        mut_warning = False
+        if mut_sell_price > 0 and (mut_buy_price / mut_sell_price) > 2.0:
+            mut_warning = True  # Insta-buy is >100% higher than Insta-sell
+
+        # 1. Simplified Setup Cost (Limit * Recipe * Buy Order)
+        recipe = RECIPES.get(mut_name, {})
         opt_cost = 0
-        for item, count in opt_counts.items():
-            price = ing_prices.get(item, 0)
-            if price == 0 and item in bazaar_data:
-                price = bazaar_data[item].get('sellPrice', 0)
-            opt_cost += price * (count * plots)
-            
-        # Hardcode manual overrides for Blastberry-radius crops
-        # Blastberry destroys a 3x3 area (9 tiles). So a limit of 84 doesn't need 84 Blastberries, it needs ceil(84/9) = 10.
+        ing_warning = False
+        
         if mut_name == 'Shellfruit':
-            # 1 Blastberry needed to explode ~8 Turtlellini.
-            # Verified via SkyMutations layout: an 84 Shellfruit limit plot needs exactly 16 Blastberries.
-            blast_price = bazaar_data.get('Blastberry', {}).get('sellPrice', 0)
-            turt_price = bazaar_data.get('Turtlellini', {}).get('sellPrice', 0)
-            real_cost_per_plot = (16 * blast_price) + (limit * turt_price)
-            opt_cost = real_cost_per_plot * plots
+            # 16 Blastberry + 84 Turtlellinis (override)
+            blast = bazaar_data.get('Blastberry', {"buyPrice": 0, "sellPrice": 0})
+            turt = bazaar_data.get('Turtlellini', {"buyPrice": 0, "sellPrice": 0})
             
-        if mut_name == 'Startlevine':
-            # 4 Blastberry + 4 Cheesebite per 9 crops is impossible, actually Startlevine just needs 4 Blastberry per plant directly? 
-            # Or if it's radius based, let's just stick to the greedy optimizer unless specifically instructed otherwise.
-            pass
+            opt_cost += (16 * blast.get('buyPrice', blast.get('sellPrice', 0))) * plots
+            opt_cost += (84 * turt.get('buyPrice', turt.get('sellPrice', 0))) * plots
             
-        # Expected Value
-        expected_cycle_value = 0
+            if (blast.get('sellPrice', 0) > 0 and (blast.get('buyPrice', 0) / blast.get('sellPrice', 1)) > 2.0) or \
+               (turt.get('sellPrice', 0) > 0 and (turt.get('buyPrice', 0) / turt.get('sellPrice', 1)) > 2.0):
+                ing_warning = True
+        else:
+            for ing, count in recipe.items():
+                if count > 0:
+                    ing_market = bazaar_data.get(ing, {"buyPrice": 0, "sellPrice": 0})
+                    ing_buy = ing_market.get('buyPrice', ing_market.get('sellPrice', 0))
+                    opt_cost += (count * limit * ing_buy) * plots
+                    
+                    if ing_market.get('sellPrice', 0) > 0 and (ing_market.get('buyPrice', 0) / ing_market.get('sellPrice', 1)) > 2.0:
+                        ing_warning = True
+            
+        # 2. Simplified Return per Batch (One Harvest)
+        expected_drops_value = 0
         calc_mult = (2.16 * 1.3) * ((fortune / 100) + 1)
+        
         for crop_col in raw_crop_cols:
             base_drop = row[crop_col]
             if base_drop > 0:
@@ -81,36 +93,23 @@ def get_leaderboard(
                 
                 # Apply special mechanics
                 if mut_name == 'All-in Aloe':
-                    # Reddit Analysis: Expected multiplier per cycle is ~1.8x factoring in reset risks and time to reach stage 13
                     expected_drops = (full_drops * 1.8) * SPAWN_CHANCE
                 elif mut_name == 'Magic Jellybean':
-                    # Takes 120 stages (120 cycles) to get 10x drops. Average per cycle = 10/120 = 0.083x
-                    expected_drops = (full_drops * (10.0 / 120.0)) * SPAWN_CHANCE
+                    expected_drops = (full_drops * 10.0) * SPAWN_CHANCE
+                elif mut_name == 'Devourer':
+                    expected_drops = 1 * limit * SPAWN_CHANCE
                 else:
                     expected_drops = full_drops * SPAWN_CHANCE
                     
                 crop_price = NPC_PRICES.get(crop_col, 0)
                 if crop_col == "Red Mushroom " or crop_col == "Brown Mushroom": crop_price = 10
-                expected_cycle_value += expected_drops * crop_price
+                expected_drops_value += expected_drops * crop_price
                 
-        market_data = bazaar_data.get(mut_name, {"buyPrice": 0, "sellPrice": 0})
-        expected_mut_val = limit * market_data.get('sellPrice', 0) * SPAWN_CHANCE
-        expected_cycle_value += expected_mut_val
+        expected_mut_val = limit * mut_sell_price * SPAWN_CHANCE
+        total_cycle_revenue = expected_drops_value + expected_mut_val
         
-        # Batch = 1 Harvest Cycle
-        # Destructive crops destroy their specific ingredients during mutation
-        # Magic Jellybean takes 120 cycles to finish, so its ingredients rot completely before it finishes growing, 
-        # effectively making the setup cost a total loss per harvest.
-        DESTRUCTIVE_CROPS = ['Devourer', 'Shellfruit', 'Magic Jellybean']
-        
-        cycles_in_lifespan = 120.0 / cycle_time_hours
-        amortized_cost_per_cycle = opt_cost / max(1, cycles_in_lifespan)
-        
-        if mut_name in DESTRUCTIVE_CROPS:
-            profit_batch = expected_cycle_value - opt_cost
-        else:
-            profit_batch = expected_cycle_value - amortized_cost_per_cycle
-            
+        # 3. Simple Math
+        profit_batch = total_cycle_revenue - opt_cost
         profit_hour = profit_batch / cycle_time_hours
         
         leaderboard_data.append({
@@ -118,7 +117,9 @@ def get_leaderboard(
             "profit_per_hour": profit_hour,
             "profit_per_batch": profit_batch,
             "setup_cost": opt_cost,
-            "cycle_time_h": cycle_time_hours
+            "cycle_time_h": cycle_time_hours,
+            "mut_warning": mut_warning,
+            "ing_warning": ing_warning
         })
         
     # Sort by Most Profitable
