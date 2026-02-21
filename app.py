@@ -63,10 +63,10 @@ MUTATION_IDS = {
     'Fire': 'FIRE' 
 }
 
-# Base limits for 1 Plot
+# Base limits for 1 Plot (from SkyMutations.eu optimal layouts)
 MUTATION_LIMITS_1_PLOT = {
     'PlantBoy Advance': 4, 'Stoplight Petal': 4, 'Phantomleaf': 16, 'All-in Aloe': 16,
-    'Ashwreath': 16, 'Blastberry': 16, 'Cheesebite': 16, 'Chloronite': 16,
+    'Ashwreath': 52, 'Blastberry': 16, 'Cheesebite': 16, 'Chloronite': 16,
     'Chocoberry': 16, 'Choconut': 52, 'Chorus Fruit': 16, 'Cindershade': 16,
     'Coalroot': 16, 'Creambloom': 16, 'Devourer': 16, 'Do-not-eat-shroom': 16,
     'Duskbloom': 16, 'Dustgrain': 52, 'Glasscorn': 9, 'Fleshtrap': 16,
@@ -76,6 +76,104 @@ MUTATION_LIMITS_1_PLOT = {
     'Soggybud': 16, 'Startlevine': 16, 'Thunderling': 13, 'Timestalk': 16,
     'Turtlellini': 16, 'Veilshroom': 52, 'Witherbloom': 16, 'Zombud': 16
 }
+
+# Physical sizes of mutations/ingredients (default 1x1)
+CROP_SIZES = {
+    'Noctilume': 2, 'PlantBoy Advance': 2, 'Glasscorn': 2,
+    'Snoozling': 3, 'Godseed': 3,
+}
+
+# ---------------------------------------------------------
+# GREENHOUSE LAYOUT OPTIMIZER
+# ---------------------------------------------------------
+def _get_neighbors(r, c, gs=10):
+    """Get 8 neighbors (Chebyshev distance 1) within grid."""
+    return [(r+dr, c+dc) for dr in [-1,0,1] for dc in [-1,0,1]
+            if (dr or dc) and 0 <= r+dr < gs and 0 <= c+dc < gs]
+
+@st.cache_data(ttl=3600)
+def compute_optimized_plot_cost(mutation_name, _ingredient_prices_tuple):
+    """
+    Compute optimized ingredient totals for a full greenhouse plot (10x10).
+    Uses greedy layout optimization: starts with all tiles as mutations, 
+    iteratively converts the most strategically valuable tiles to ingredients.
+    Expensive ingredients are placed in high-sharing positions first.
+    
+    Returns: dict {ingredient_name: total_tiles_needed}
+    """
+    ingredient_prices = dict(_ingredient_prices_tuple)
+    recipe = RECIPES.get(mutation_name, {})
+    limit = MUTATION_LIMITS_1_PLOT.get(mutation_name, 16)
+    gs = 10
+    
+    total_needed = sum(recipe.values())
+    if total_needed == 0:
+        return {}
+    
+    blocked = {(0, 0)}
+    all_tiles = set((r, c) for r in range(gs) for c in range(gs)) - blocked
+    n_to_convert = len(all_tiles) - limit
+    
+    if n_to_convert <= 0:
+        return {k: v * limit for k, v in recipe.items()}
+    
+    # Precompute neighbors
+    nbrs = {t: set((nr, nc) for nr, nc in _get_neighbors(t[0], t[1], gs) if (nr, nc) in all_tiles)
+            for t in all_tiles}
+    
+    sorted_ings = sorted([i for i in recipe if recipe[i] > 0],
+                         key=lambda x: ingredient_prices.get(x, 0), reverse=True)
+    
+    is_mut = {t: True for t in all_tiles}
+    ing_type = {}
+    
+    def get_needs(mt):
+        n = dict(recipe)
+        for nb in nbrs[mt]:
+            if not is_mut[nb] and nb in ing_type:
+                ig = ing_type[nb]
+                if n.get(ig, 0) > 0: n[ig] -= 1
+        return n
+    
+    def unmet_for(mt):
+        return sum(max(0, v) for v in get_needs(mt).values())
+    
+    # Phase 1: Greedily convert mutations to ingredients
+    for _ in range(n_to_convert):
+        best_t, best_i, best_s = None, None, -1
+        for cand in [t for t in all_tiles if is_mut[t]]:
+            own = unmet_for(cand)
+            for ing in sorted_ings:
+                benefit = sum(1 for nb in nbrs[cand] if is_mut[nb] and get_needs(nb).get(ing, 0) > 0)
+                score = own + benefit
+                if score > best_s:
+                    best_s, best_t, best_i = score, cand, ing
+        if best_t is None: break
+        is_mut[best_t] = False
+        ing_type[best_t] = best_i
+    
+    # Phase 2: Improve ingredient type assignments
+    def total_unmet():
+        return sum(unmet_for(t) for t in all_tiles if is_mut[t])
+    
+    for _ in range(10):
+        if total_unmet() == 0: break
+        improved = False
+        for tile in list(ing_type):
+            curr = ing_type[tile]
+            cu = total_unmet()
+            for ni in sorted_ings:
+                if ni == curr: continue
+                ing_type[tile] = ni
+                if total_unmet() < cu:
+                    improved = True; break
+                ing_type[tile] = curr
+        if not improved: break
+    
+    counts = {}
+    for t, i in ing_type.items():
+        counts[i] = counts.get(i, 0) + 1
+    return counts
 
 # NPC Sell Prices (For Cost Calc)
 NPC_PRICES = {
@@ -110,14 +208,14 @@ GROWTH_STAGES = {
 
 # Recipes
 RECIPES = {
-    'Ashwreath': {'Nether Wart': 4, 'Fire': 4},
-    'Choconut': {'Cocoa Beans': 4},
-    'Dustgrain': {'Wheat': 4},
+    'Ashwreath': {'Nether Wart': 2, 'Fire': 2},
+    'Choconut': {'Cocoa Beans': 2},
+    'Dustgrain': {'Wheat': 2},
     'Gloomgourd': {'Pumpkin': 1, 'Melon': 1},
     'Lonelily': {'Adjacent Crops': 0}, 
-    'Scourroot': {'Potato': 2, 'Carrot': 2},
+    'Scourroot': {'Potato': 1, 'Carrot': 1},
     'Shadevine': {'Cactus': 2, 'Sugar Cane': 2},
-    'Veilshroom': {'Red Mushroom': 2, 'Brown Mushroom': 2},
+    'Veilshroom': {'Red Mushroom': 1, 'Brown Mushroom': 1},
     'Witherbloom': {'Dead Bush': 8},
     
     'Chocoberry': {'Choconut': 6, 'Gloomgourd': 2},
@@ -293,10 +391,29 @@ plots = st.sidebar.select_slider("Number of Plots", options=[1, 2, 3], value=sav
 saved_fortune = user_prefs.get("fortune", 2500)
 fortune = st.sidebar.number_input("Farming Fortune", value=saved_fortune, step=50)
 
+st.sidebar.markdown("---")
+st.sidebar.subheader("Time & Upgrade Settings")
+saved_gh_upg = user_prefs.get("gh_upgrade", 9)
+gh_upgrade = st.sidebar.slider("Greenhouse Upgrade Level", 0, 9, saved_gh_upg, help="-25% cycle time at max")
+saved_unique = user_prefs.get("unique_crops", 12)
+unique_crops = st.sidebar.slider("Unique Crops Placed", 0, 12, saved_unique, help="-30% cycle time at max")
+
+# Calculate Cycle Time
+base_cycle_hours = 4.0
+gh_reduction = (gh_upgrade / 9.0) * 0.25
+unique_reduction = (unique_crops / 12.0) * 0.30
+cycle_time_hours = base_cycle_hours * (1.0 - gh_reduction - unique_reduction)
+
+# Standard spawn chance per cycle
+SPAWN_CHANCE = 0.25
+# 5 days (120 hours) lifespan
+BATCH_LIFESPAN_HOURS = 120.0
+total_cycles_per_batch = BATCH_LIFESPAN_HOURS / cycle_time_hours
+
 # ---------------------------------------------------------
 # 5. TABS
 # ---------------------------------------------------------
-tab1, tab2 = st.tabs(["📊 Optimizer", "📖 Recipes & Costs"])
+tab1, tab2, tab3 = st.tabs(["📊 Optimizer", "📖 Recipes & Costs", "🏆 Profit Leaderboard"])
 
 # =========================================================
 # TAB 1: OPTIMIZER
@@ -308,10 +425,12 @@ with tab1:
     mode_index = mode_options.index(saved_mode) if saved_mode in mode_options else 0
     mode = st.sidebar.radio("Optimization Mode", mode_options, index=mode_index)
     
-    if fortune != saved_fortune or mode != saved_mode or plots != saved_plots:
+    if fortune != saved_fortune or mode != saved_mode or plots != saved_plots or gh_upgrade != saved_gh_upg or unique_crops != saved_unique:
         user_prefs["fortune"] = fortune
         user_prefs["mode"] = mode
         user_prefs["plots"] = plots
+        user_prefs["gh_upgrade"] = gh_upgrade
+        user_prefs["unique_crops"] = unique_crops
         save_user_data(user_prefs)
 
     st.title("🏆 Crop Milestones")
@@ -437,53 +556,193 @@ with tab2:
         
         total_setup_cost = unit_cost * limit
 
-        # --- ESTIMATED RETURN ---
+        # --- OPTIMIZED PLOT COST ---
+        # Build ingredient prices dict for the optimizer
+        ing_prices = {}
+        for item in ingredients:
+            if item in NPC_PRICES:
+                ing_prices[item] = NPC_PRICES[item]
+            elif item in bazaar_data:
+                ing_prices[item] = bazaar_data[item].get('sellPrice', 0)
+        
+        # Compute optimized layout for 1 plot, then scale by plots
+        opt_counts = compute_optimized_plot_cost(selected_recipe_mut, tuple(sorted(ing_prices.items())))
+        
+        # Calculate optimized cost
+        opt_cost = 0
+        opt_display = []
+        for item, count in opt_counts.items():
+            price = ing_prices.get(item, 0)
+            if price == 0 and item in bazaar_data:
+                price = bazaar_data[item].get('sellPrice', 0)
+            total_for_item = count * plots
+            item_cost = price * total_for_item
+            opt_cost += item_cost
+            price_str = f"{item_cost:,.0f} coins" if price > 0 else "Free/Hidden"
+            opt_display.append(f"<b>{total_for_item}x {item}</b> <span class='cost-text'>{price_str}</span>")
+        
+        savings = total_setup_cost - opt_cost if total_setup_cost > 0 else 0
+        savings_pct = (savings / total_setup_cost * 100) if total_setup_cost > 0 else 0
+
+        # --- ESTIMATED RETURN (Per Cycle vs Per Batch) ---
         row = df[df['Mutation/Drops'] == selected_recipe_mut].iloc[0] if not df[df['Mutation/Drops'] == selected_recipe_mut].empty else None
         return_details = []
-        total_return_value = 0
+        expected_cycle_value = 0
         
         if row is not None:
+            # 2.16 = base fortune mult? We scale drop value by spawn chance (0.25)
             calc_mult = (2.16 * 1.3) * ((fortune / 100) + 1)
             for crop_col in raw_crop_cols:
                 base_drop = row[crop_col]
                 if base_drop > 0:
-                    total_drops = base_drop * limit * calc_mult
+                    # Total raw drops per harvest if it spawns
+                    full_drops = base_drop * limit * calc_mult
+                    
+                    # Apply special mechanics per crop
+                    if selected_recipe_mut == 'All-in Aloe':
+                        # Reddit Analysis: Stage 13 is optimal, providing ~41x multiplier on drops
+                        expected_drops = (full_drops * 41.0) * SPAWN_CHANCE
+                    elif selected_recipe_mut == 'Magic Jellybean':
+                        # Scales 1x per 12 stages up to 120 stages (10x drops at max)
+                        expected_drops = (full_drops * 10.0) * SPAWN_CHANCE
+                    else:
+                        # Standard 25% spawn chance
+                        expected_drops = full_drops * SPAWN_CHANCE
+                    
                     crop_price = NPC_PRICES.get(crop_col, 0)
                     if crop_col == "Red Mushroom " or crop_col == "Brown Mushroom": crop_price = 10
-                    val = total_drops * crop_price
-                    total_return_value += val
-                    # FIX: Use proper HTML tags
-                    return_details.append(f"{format_big_number(total_drops)} {crop_col} <span class='cost-text'>({format_big_number(val)} coins)</span>")
+                    
+                    val = expected_drops * crop_price
+                    expected_cycle_value += val
+                    
+                    return_details.append(f"~{format_big_number(expected_drops)} {crop_col} <span class='cost-text'>({format_big_number(val)} coins/cycle)</span>")
         
         mut_unit_price = market_data.get('sellPrice', 0)
-        mut_return_val = limit * mut_unit_price
-        total_return_value += mut_return_val
+        # Expected mutation drop value per cycle
+        expected_mut_val = limit * mut_unit_price * SPAWN_CHANCE
+        expected_cycle_value += expected_mut_val
+        
+        # Batch metrics
+        batch_return_value = expected_cycle_value * total_cycles_per_batch
+        profit_per_batch = batch_return_value - opt_cost
+        profit_per_hour = profit_per_batch / BATCH_LIFESPAN_HOURS
         
         col_d1, col_d2 = st.columns(2)
         with col_d1:
             st.markdown(f"""
             <div style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #ddd;">
                 <h4>🛒 Setup Cost</h4>
-                <ul>{''.join([f'<li>{x}</li>' for x in ingredients_display])}</ul>
+                <div style="margin-bottom:10px;">
+                    <b>Per Plant:</b> {', '.join([f'{qty}x {item}' for item, qty in ingredients.items()])}
+                </div>
+                <div><b>Naive Cost (no overlap):</b> <span style="text-decoration: line-through; color: #999;">{format_big_number(total_setup_cost)} coins</span></div>
+                <div style="margin-top:8px;">
+                    <b>Optimized Plot Cost:</b>
+                </div>
+                <ul>{''.join([f'<li>{x}</li>' for x in opt_display])}</ul>
                 <hr>
-                <div><b>Unit Cost:</b> {unit_cost:,.0f} coins</div>
-                <div style="margin-top:5px;"><b style="color:#d9534f;">Max Setup Cost: {format_big_number(total_setup_cost)} coins</b></div>
-                <small>For {limit} placements ({plots} Plots)</small>
+                <div style="font-size:1.1em;"><b style="color:#28a745;">Actual Cost: {format_big_number(opt_cost)} coins</b></div>
+                <div style="margin-top:3px;"><span style="background:#c3e6cb; color:#155724; padding:2px 8px; border-radius:6px; font-size:0.85em; font-weight:bold;">Saves {savings_pct:.0f}% with overlap</span></div>
+                <small>For {limit} placements ({plots} Plots) valid for 5 days</small>
             </div>
             """, unsafe_allow_html=True)
             
         with col_d2:
             st.markdown(f"""
             <div style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #28a745;">
-                <h4 style="color:#155724;">💰 Estimated Return (Per Harvest)</h4>
+                <h4 style="color:#155724;">💰 Expected Return (Per {cycle_time_hours:.2f}h Cycle)</h4>
                 <div style="margin-bottom:10px;">
-                    <b>You get:</b> {limit}x {selected_recipe_mut} <span class='cost-text'>({format_big_number(mut_return_val)} coins)</span>
+                    <b>You get:</b> ~{limit * SPAWN_CHANCE:.1f}x {selected_recipe_mut} <span class='cost-text'>({format_big_number(expected_mut_val)} coins)</span>
                 </div>
-                <ul>{''.join([f'<li>{x}</li>' for x in return_details])}</ul>
+                <small style="color:red; font-weight:bold;">↳ Estimates factor in 25% drop chance</small>
+                <ul style="margin-top:10px;">{''.join([f'<li>{x}</li>' for x in return_details])}</ul>
                 <hr>
-                <div style="font-size:1.2em;"><b>Total Value: {format_big_number(total_return_value)} coins</b></div>
-                <small>With {fortune} Fortune</small>
+                <div style="font-size:1.2em;"><b>Expected Cycle Value: {format_big_number(expected_cycle_value)} coins</b></div>
+                <small>With {fortune} Fortune | {total_cycles_per_batch:.1f} cycles in 5 days</small>
             </div>
             """, unsafe_allow_html=True)
             
-        st.info(f"**Estimated Profit:** {format_big_number(total_return_value - total_setup_cost)} coins (Return - Cost)")
+        st.info(f"**Profit / Batch (5 Days):** {format_big_number(profit_per_batch)} coins | **Profit / Hour:** {format_big_number(profit_per_hour)} coins")
+
+# =========================================================
+# TAB 3: PROFIT LEADERBOARD
+# =========================================================
+with tab3:
+    st.header("🏆 Profit Leaderboard")
+    st.markdown("Sort all mutations by **Profit / Hour** or **Profit / Batch (5 Days)**.")
+    
+    if st.button("Calculate Leaderboard (Takes a few seconds)"):
+        with st.spinner("Crunching numbers..."):
+            leaderboard_data = []
+            
+            for index, row in df.iterrows():
+                mut_name = row['Mutation/Drops']
+                if mut_name == 'Made by Zigzagbrain' or mut_name not in RECIPES: 
+                    continue
+                
+                limit = row['Base_Limit'] * plots
+                ingredients = RECIPES.get(mut_name, {})
+                ing_prices = {}
+                for item in ingredients:
+                    if item in NPC_PRICES:
+                        ing_prices[item] = NPC_PRICES[item]
+                    elif item in bazaar_data:
+                        ing_prices[item] = bazaar_data[item].get('sellPrice', 0)
+                
+                # Optimized Cost
+                opt_counts = compute_optimized_plot_cost(mut_name, tuple(sorted(ing_prices.items())))
+                opt_cost = 0
+                for item, count in opt_counts.items():
+                    price = ing_prices.get(item, 0)
+                    if price == 0 and item in bazaar_data:
+                        price = bazaar_data[item].get('sellPrice', 0)
+                    opt_cost += price * (count * plots)
+                
+                # Expected Cycle Value
+                expected_cycle_value = 0
+                calc_mult = (2.16 * 1.3) * ((fortune / 100) + 1)
+                for crop_col in raw_crop_cols:
+                    base_drop = row[crop_col]
+                    if base_drop > 0:
+                        full_drops = base_drop * limit * calc_mult
+                        
+                        # Apply special mechanics
+                        if mut_name == 'All-in Aloe':
+                            expected_drops = (full_drops * 41.0) * SPAWN_CHANCE
+                        elif mut_name == 'Magic Jellybean':
+                            expected_drops = (full_drops * 10.0) * SPAWN_CHANCE
+                        else:
+                            expected_drops = full_drops * SPAWN_CHANCE
+                        crop_price = NPC_PRICES.get(crop_col, 0)
+                        if crop_col == "Red Mushroom " or crop_col == "Brown Mushroom": crop_price = 10
+                        expected_cycle_value += expected_drops * crop_price
+                
+                market_data = bazaar_data.get(mut_name, {"buyPrice": 0, "sellPrice": 0})
+                expected_mut_val = limit * market_data.get('sellPrice', 0) * SPAWN_CHANCE
+                expected_cycle_value += expected_mut_val
+                
+                batch_return = expected_cycle_value * total_cycles_per_batch
+                profit_batch = batch_return - opt_cost
+                profit_hour = profit_batch / BATCH_LIFESPAN_HOURS
+                
+                leaderboard_data.append({
+                    "Mutation": mut_name,
+                    "Profit / Hour": profit_hour,
+                    "Profit / Batch": profit_batch,
+                    "Setup Cost": opt_cost,
+                    "Cycle Time (h)": cycle_time_hours
+                })
+                
+            ldf = pd.DataFrame(leaderboard_data)
+            # Format display
+            def fm(x): return f"{x:,.0f}"
+            st.dataframe(
+                ldf.style.format({
+                    "Profit / Hour": fm,
+                    "Profit / Batch": fm,
+                    "Setup Cost": fm,
+                    "Cycle Time (h)": "{:.2f}"
+                }),
+                height=600,
+                use_container_width=True
+            )

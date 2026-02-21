@@ -1,0 +1,96 @@
+﻿============================================================
+ASHWREATH OPTIMIZATION TEST
+Expected: 26 Wart + 21 Fire (from user's optimizer)
+Naive: 64 Wart + 64 Fire = 128 total tiles
+============================================================
+Placed: 16/16 mutations
+Unmet requirements: 44
+Plant counts: {'Nether Wart': 24, 'Fire': 60}
+Tile counts: {'Fire': 60, 'Nether Wart': 24}
+
+Ashwreath (size=1, limit=16, placed=16):
+M . . M . . M . . M
+. . . . . . . . . .
+. . . . . . . . . .
+M . . M . . M . . M
+. . . . . . . . . .
+. . . . . . . . . .
+M . . M . . M . . M
+. . . . . . . . . .
+. . . . . . . . . .
+M . . M . . M . . M
+
+============================================================
+TESTING ALL MUTATIONS
+============================================================
+python : Traceback 
+(most recent call 
+last):
+At line:1 char:1
++ python 
+optimizer_test.py 
+2>&1 | Out-File 
+-FilePath 
+optimizer_output.t 
+...
++ ~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~
+    + CategoryInfo   
+           : NotSpe  
+  cified: (Traceba   
+ ck (most recent     
+call last)::Stri    
+ng) [], RemoteEx    
+ception
+    + FullyQualified 
+   ErrorId : Native  
+  CommandError
+ 
+  File 
+"C:\Users\Sangam Bart
+aula\Documents\Practi
+ce Programs\Mutations
+\optimizer_test.py", 
+line 453, in <module>
+    print(f"{status} 
+{name:25s} | Placed {
+placed:2d}/{limit:2d}
+ | "
+    ~~~~~^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^
+^^^^
+          f"Tiles: 
+{opt_tiles:3d} vs 
+Naive: {naive:3d} | "
+          ^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^
+          f"Save: 
+{savings:4.0f}% | 
+{ing_str}")
+          ^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^
+^^^^^
+  File 
+"C:\Users\Sangam Bart
+aula\AppData\Local\Pr
+ograms\Python\Python3
+13\Lib\encodings\cp12
+52.py", line 19, in 
+encode
+    return codecs.cha
+rmap_encode(input,sel
+f.errors,encoding_tab
+le)[0]
+           ~~~~~~~~~~
+~~~~~~~~~~~^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^
+^^^
+UnicodeEncodeError: 
+'charmap' codec 
+can't encode 
+character '\u2717' 
+in position 0: 
+character maps to 
+<undefined>

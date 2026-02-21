@@ -1,0 +1,16 @@
+﻿======================================================================
+ASHWREATH (Revamped: 2W+2F, Limit=52)
+Expected: 26 Wart + 21 Fire = 47 total
+======================================================================
+  Wart expensive: {'Nether Wart': 23, 'Fire': 24} total=47 unmet=11 placed=52
+  Fire expensive: {'Fire': 23, 'Nether Wart': 24} total=47 unmet=11 placed=52
+
+======================================================================
+OTHER MUTATIONS
+======================================================================
+  FAIL(unmet=10)       Choconut             | 52/52 | opt=47 naive=208 save=77% | 47 Cocoa Beans
+  FAIL(unmet=10)       Dustgrain            | 52/52 | opt=47 naive=208 save=77% | 47 Wheat
+  FAIL(unmet=11)       Gloomgourd           | 72/72 | opt=27 naive=144 save=81% | 14 Melon, 13 Pumpkin
+  FAIL(unmet=11)       Scourroot            | 52/52 | opt=47 naive=208 save=77% | 24 Carrot, 23 Potato
+  FAIL(unmet=3)        Witherbloom          | 16/16 | opt=83 naive=128 save=35% | 83 Dead Bush
+
