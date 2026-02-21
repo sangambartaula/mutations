@@ -192,6 +192,12 @@ export default function Home() {
                         <td className="px-6 py-4 font-medium">
                           {item.mutation}
                           {idx === 0 && <span className="ml-2 text-[10px] uppercase tracking-wider font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 px-2 py-0.5 rounded-full">Top Pick</span>}
+                          {item.mutation === 'Magic Jellybean' && (
+                            <div className="text-[10px] text-neutral-400 mt-1">Requires 120 cycles (10x drops max)</div>
+                          )}
+                          {item.mutation === 'All-in Aloe' && (
+                            <div className="text-[10px] text-neutral-400 mt-1">Stops at Stage 13-14 optimally</div>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
                           {formatCoins(item.profit_per_batch)}
