@@ -56,6 +56,20 @@ def get_leaderboard(
                 price = bazaar_data[item].get('sellPrice', 0)
             opt_cost += price * (count * plots)
             
+        # Hardcode manual overrides for Blastberry-radius crops
+        # Blastberry destroys a 3x3 area (9 tiles). So a limit of 84 doesn't need 84 Blastberries, it needs ceil(84/9) = 10.
+        if mut_name == 'Shellfruit':
+            # 1 Blastberry + 1 Turtellini per 9 crops
+            blast_price = bazaar_data.get('Blastberry', {}).get('sellPrice', 0)
+            turt_price = bazaar_data.get('Turtlellini', {}).get('sellPrice', 0)
+            real_cost_per_plot = (10 * blast_price) + (10 * turt_price)
+            opt_cost = real_cost_per_plot * plots
+            
+        if mut_name == 'Startlevine':
+            # 4 Blastberry + 4 Cheesebite per 9 crops is impossible, actually Startlevine just needs 4 Blastberry per plant directly? 
+            # Or if it's radius based, let's just stick to the greedy optimizer unless specifically instructed otherwise.
+            pass
+            
         # Expected Value
         expected_cycle_value = 0
         calc_mult = (2.16 * 1.3) * ((fortune / 100) + 1)
@@ -83,11 +97,17 @@ def get_leaderboard(
         expected_cycle_value += expected_mut_val
         
         # Batch = 1 Harvest Cycle
-        # Devourer destroys its ingredients, so setup cost is paid EVERY harvest
-        if mut_name == 'Devourer':
+        # Destructive crops destroy their specific ingredients during mutation
+        # So we MUST deduct the optimal layout setup cost from every single cycle!
+        DESTRUCTIVE_CROPS = ['Devourer', 'Shellfruit', 'Zombud', 'Chloronite', 'Fleshtrap']
+        
+        cycles_in_lifespan = 120.0 / cycle_time_hours
+        amortized_cost_per_cycle = opt_cost / max(1, cycles_in_lifespan)
+        
+        if mut_name in DESTRUCTIVE_CROPS:
             profit_batch = expected_cycle_value - opt_cost
         else:
-            profit_batch = expected_cycle_value 
+            profit_batch = expected_cycle_value - amortized_cost_per_cycle
             
         profit_hour = profit_batch / cycle_time_hours
         

@@ -581,6 +581,16 @@ with tab2:
             price_str = f"{item_cost:,.0f} coins" if price > 0 else "Free/Hidden"
             opt_display.append(f"<b>{total_for_item}x {item}</b> <span class='cost-text'>{price_str}</span>")
         
+        # Hardcode manual overrides for Blastberry-radius crops
+        # Blastberry destroys a 3x3 area (9 tiles). So a limit of 84 doesn't need 84 Blastberries, it needs ceil(84/9) = 10.
+        if selected_recipe_mut == 'Shellfruit':
+            blast_price = bazaar_data.get('Blastberry', {}).get('sellPrice', 0)
+            turt_price = bazaar_data.get('Turtlellini', {}).get('sellPrice', 0)
+            real_cost_per_plot = (10 * blast_price) + (10 * turt_price)
+            opt_cost = real_cost_per_plot * plots
+            opt_display = [f"<b>{10*plots}x Blastberry</b> <span class='cost-text'>{10*plots*blast_price:,.0f} coins</span>",
+                           f"<b>{10*plots}x Turtlellini</b> <span class='cost-text'>{10*plots*turt_price:,.0f} coins</span>"]
+
         savings = total_setup_cost - opt_cost if total_setup_cost > 0 else 0
         savings_pct = (savings / total_setup_cost * 100) if total_setup_cost > 0 else 0
 
@@ -596,7 +606,11 @@ with tab2:
                 base_drop = row[crop_col]
                 if base_drop > 0:
                     # Total raw drops per harvest if it spawns
-                    full_drops = base_drop * limit * calc_mult
+                    if selected_recipe_mut == 'Devourer':
+                        # Devourer just drops exactly 1 Devourer. It doesn't scale by limit*fortune like standard crops.
+                        full_drops = 1.0
+                    else:
+                        full_drops = base_drop * limit * calc_mult
                     
                     # Apply special mechanics per crop
                     if selected_recipe_mut == 'All-in Aloe':
@@ -619,14 +633,23 @@ with tab2:
         
         mut_unit_price = market_data.get('sellPrice', 0)
         # Expected mutation drop value per cycle
-        expected_mut_val = limit * mut_unit_price * SPAWN_CHANCE
+        if selected_recipe_mut == 'Devourer':
+            # Devourer drops EXACTLY 1 Devourer (not 16 * fortune)
+            expected_mut_val = mut_unit_price * SPAWN_CHANCE
+        else:
+            expected_mut_val = limit * mut_unit_price * SPAWN_CHANCE
         expected_cycle_value += expected_mut_val
         
         # Batch metrics (1 Harvest Cycle)
-        if selected_recipe_mut == 'Devourer':
+        # Amortize setup cost over the 5-day (120 hour) lifespan for standard crops
+        cycles_in_lifespan = 120.0 / cycle_time_hours
+        amortized_cost_per_cycle = opt_cost / max(1, cycles_in_lifespan)
+        
+        DESTRUCTIVE_CROPS = ['Devourer', 'Shellfruit', 'Zombud', 'Chloronite', 'Fleshtrap']
+        if selected_recipe_mut in DESTRUCTIVE_CROPS:
             profit_per_batch = expected_cycle_value - opt_cost
         else:
-            profit_per_batch = expected_cycle_value
+            profit_per_batch = expected_cycle_value - amortized_cost_per_cycle
             
         profit_per_hour = profit_per_batch / cycle_time_hours
         
@@ -707,7 +730,10 @@ with tab3:
                 for crop_col in raw_crop_cols:
                     base_drop = row[crop_col]
                     if base_drop > 0:
-                        full_drops = base_drop * limit * calc_mult
+                        if mut_name == 'Devourer':
+                            full_drops = 1.0
+                        else:
+                            full_drops = base_drop * limit * calc_mult
                         
                         # Apply special mechanics
                         if mut_name == 'All-in Aloe':
@@ -721,13 +747,20 @@ with tab3:
                         expected_cycle_value += expected_drops * crop_price
                 
                 market_data = bazaar_data.get(mut_name, {"buyPrice": 0, "sellPrice": 0})
-                expected_mut_val = limit * market_data.get('sellPrice', 0) * SPAWN_CHANCE
+                if mut_name == 'Devourer':
+                    expected_mut_val = market_data.get('sellPrice', 0) * SPAWN_CHANCE
+                else:
+                    expected_mut_val = limit * market_data.get('sellPrice', 0) * SPAWN_CHANCE
                 expected_cycle_value += expected_mut_val
                 
-                if mut_name == 'Devourer':
+                cycles_in_lifespan = 120.0 / cycle_time_hours
+                amortized_cost_per_cycle = opt_cost / max(1, cycles_in_lifespan)
+                
+                DESTRUCTIVE_CROPS = ['Devourer', 'Shellfruit', 'Zombud', 'Chloronite', 'Fleshtrap']
+                if mut_name in DESTRUCTIVE_CROPS:
                     profit_batch = expected_cycle_value - opt_cost
                 else:
-                    profit_batch = expected_cycle_value
+                    profit_batch = expected_cycle_value - amortized_cost_per_cycle
                     
                 profit_hour = profit_batch / cycle_time_hours
                 
