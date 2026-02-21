@@ -1,7 +1,9 @@
+import csv
+import io
+import math
 from fastapi import FastAPI, Query
 from typing import Dict, Any
-from app import compute_optimized_plot_cost, RECIPES, NPC_PRICES, get_bazaar_prices, get_processed_data, MUTATION_LIMITS_1_PLOT
-import math
+from api.shared_data import RECIPES, NPC_PRICES, get_bazaar_prices, MUTATION_LIMITS_1_PLOT, csv_data
 
 app = FastAPI(title="Skyblock Mutations API")
 
@@ -19,7 +21,13 @@ def get_leaderboard(
     
     # Load Data
     bazaar_data = get_bazaar_prices()
-    df, raw_crop_cols = get_processed_data()
+    
+    reader = csv.DictReader(io.StringIO(csv_data))
+    raw_crop_cols = [c.strip() for c in reader.fieldnames if c.strip() not in ['Mutation/Drops', 'Base_Limit', 'Crop Fortune type', 'If u figure it out...']]
+    
+    # We need to clean up keys slightly because CSV reader keys might retain trailing whitespace
+    # we'll map original keys to cleaned columns during iteration if needed, but standardizing works
+    # Actually, Pandas `strip()` logic in get_processed_data() was needed. Let's do it dynamically.
     
     # Cycle Time Math
     base_cycle_hours = 4.0
@@ -33,12 +41,15 @@ def get_leaderboard(
     
     leaderboard_data = []
     
-    for index, row in df.iterrows():
-        mut_name = row['Mutation/Drops']
+    for row in reader:
+        # Strip all keys to replicate Pandas string stripping
+        cleaned_row = {k.strip(): v for k, v in row.items()}
+        mut_name = cleaned_row.get('Mutation/Drops', '')
+        
         if mut_name == 'Made by Zigzagbrain' or mut_name not in RECIPES: 
             continue
             
-        limit = row['Base_Limit'] * plots
+        limit = MUTATION_LIMITS_1_PLOT.get(mut_name, 1) * plots
         ingredients = RECIPES.get(mut_name, {})
         ing_prices = {}
         for item in ingredients:
@@ -87,7 +98,9 @@ def get_leaderboard(
         calc_mult = (2.16 * 1.3) * ((fortune / 100) + 1)
         
         for crop_col in raw_crop_cols:
-            base_drop = row[crop_col]
+            raw_val = cleaned_row.get(crop_col, "0.0")
+            base_drop = float(raw_val) if raw_val and raw_val.strip() else 0.0
+            
             if base_drop > 0:
                 full_drops = base_drop * limit * calc_mult
                 
