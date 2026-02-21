@@ -59,10 +59,11 @@ def get_leaderboard(
         # Hardcode manual overrides for Blastberry-radius crops
         # Blastberry destroys a 3x3 area (9 tiles). So a limit of 84 doesn't need 84 Blastberries, it needs ceil(84/9) = 10.
         if mut_name == 'Shellfruit':
-            # 1 Blastberry + 1 Turtellini per 9 crops
+            # 1 Blastberry needed to explode 8 Turtlellini.
+            # So for a limit of 84 Shellfruit, we need ~11 Blastberries and 84 Turtlellini.
             blast_price = bazaar_data.get('Blastberry', {}).get('sellPrice', 0)
             turt_price = bazaar_data.get('Turtlellini', {}).get('sellPrice', 0)
-            real_cost_per_plot = (10 * blast_price) + (10 * turt_price)
+            real_cost_per_plot = (11 * blast_price) + (limit * turt_price)
             opt_cost = real_cost_per_plot * plots
             
         if mut_name == 'Startlevine':
@@ -99,7 +100,7 @@ def get_leaderboard(
         # Batch = 1 Harvest Cycle
         # Destructive crops destroy their specific ingredients during mutation
         # So we MUST deduct the optimal layout setup cost from every single cycle!
-        DESTRUCTIVE_CROPS = ['Devourer', 'Shellfruit', 'Zombud', 'Chloronite', 'Fleshtrap']
+        DESTRUCTIVE_CROPS = ['Devourer', 'Shellfruit']
         
         cycles_in_lifespan = 120.0 / cycle_time_hours
         amortized_cost_per_cycle = opt_cost / max(1, cycles_in_lifespan)

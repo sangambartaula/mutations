@@ -586,10 +586,10 @@ with tab2:
         if selected_recipe_mut == 'Shellfruit':
             blast_price = bazaar_data.get('Blastberry', {}).get('sellPrice', 0)
             turt_price = bazaar_data.get('Turtlellini', {}).get('sellPrice', 0)
-            real_cost_per_plot = (10 * blast_price) + (10 * turt_price)
+            real_cost_per_plot = (11 * blast_price) + (limit * turt_price)
             opt_cost = real_cost_per_plot * plots
-            opt_display = [f"<b>{10*plots}x Blastberry</b> <span class='cost-text'>{10*plots*blast_price:,.0f} coins</span>",
-                           f"<b>{10*plots}x Turtlellini</b> <span class='cost-text'>{10*plots*turt_price:,.0f} coins</span>"]
+            opt_display = [f"<b>{11*plots}x Blastberry</b> <span class='cost-text'>{11*plots*blast_price:,.0f} coins</span>",
+                           f"<b>{limit*plots}x Turtlellini</b> <span class='cost-text'>{limit*plots*turt_price:,.0f} coins</span>"]
 
         savings = total_setup_cost - opt_cost if total_setup_cost > 0 else 0
         savings_pct = (savings / total_setup_cost * 100) if total_setup_cost > 0 else 0
@@ -645,7 +645,7 @@ with tab2:
         cycles_in_lifespan = 120.0 / cycle_time_hours
         amortized_cost_per_cycle = opt_cost / max(1, cycles_in_lifespan)
         
-        DESTRUCTIVE_CROPS = ['Devourer', 'Shellfruit', 'Zombud', 'Chloronite', 'Fleshtrap']
+        DESTRUCTIVE_CROPS = ['Devourer', 'Shellfruit']
         if selected_recipe_mut in DESTRUCTIVE_CROPS:
             profit_per_batch = expected_cycle_value - opt_cost
         else:
@@ -756,7 +756,7 @@ with tab3:
                 cycles_in_lifespan = 120.0 / cycle_time_hours
                 amortized_cost_per_cycle = opt_cost / max(1, cycles_in_lifespan)
                 
-                DESTRUCTIVE_CROPS = ['Devourer', 'Shellfruit', 'Zombud', 'Chloronite', 'Fleshtrap']
+                DESTRUCTIVE_CROPS = ['Devourer', 'Shellfruit']
                 if mut_name in DESTRUCTIVE_CROPS:
                     profit_batch = expected_cycle_value - opt_cost
                 else:
