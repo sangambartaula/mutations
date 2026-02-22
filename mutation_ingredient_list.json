@@ -1,0 +1,277 @@
+{
+  "All-in Aloe": {
+    "count": 16,
+    "ingredients": {
+      "Magic Jellybean": 44,
+      "Plant Boy Advance": 9
+    }
+  },
+  "Ashwreath": {
+    "count": 52,
+    "ingredients": {
+      "Nether Wart": 26,
+      "Fire": 21
+    }
+  },
+  "Blastberry": {
+    "count": 16,
+    "ingredients": {
+      "Ashwreath": 34,
+      "Chocoberry": 31
+    }
+  },
+  "Cheesebite": {
+    "count": 16,
+    "ingredients": {
+      "Fermento": 42,
+      "Creambloom": 23
+    }
+  },
+  "Chloronite": {
+    "count": 16,
+    "ingredients": {
+      "Coalroot": 55,
+      "Thornshade": 12
+    }
+  },
+  "Chocoberry": {
+    "count": 16,
+    "ingredients": {
+      "Choconut": 41,
+      "Gloomgourd": 24
+    }
+  },
+  "Choconut": {
+    "count": 72,
+    "ingredients": {
+      "Cocoa Beans": 28
+    }
+  },
+  "Chorus Fruit": {
+    "count": 16,
+    "ingredients": {
+      "Magic Jellybean": 34,
+      "Chloronite": 32
+    }
+  },
+  "Cindershade": {
+    "count": 16,
+    "ingredients": {
+      "Ashwreath": 42,
+      "Witherbloom": 24
+    }
+  },
+  "Coalroot": {
+    "count": 16,
+    "ingredients": {
+      "Ashwreath": 49,
+      "Scourroot": 18
+    }
+  },
+  "Creambloom": {
+    "count": 16,
+    "ingredients": {
+      "Choconut": 65
+    }
+  },
+  "Devourer": {
+    "count": 16,
+    "ingredients": {
+      "Zombud": 42,
+      "Puffercloud": 23
+    }
+  },
+  "Do-not-eat-shroom": {
+    "count": 16,
+    "ingredients": {
+      "Veilshroom": 42,
+      "Scourroot": 23
+    }
+  },
+  "Duskbloom": {
+    "count": 16,
+    "ingredients": {
+      "Sunflower": 25,
+      "Moonflower": 18,
+      "Shadevine": 14
+    }
+  },
+  "Dustgrain": {
+    "count": 72,
+    "ingredients": {
+      "Wheat Seeds": 27
+    }
+  },
+  "Fleshtrap": {
+    "count": 16,
+    "ingredients": {
+      "Lonelily": 42,
+      "Cindershade": 26
+    }
+  },
+  "Glasscorn": {
+    "count": 9,
+    "ingredients": {
+      "Chloronite": 38,
+      "Startlevine": 26
+    }
+  },
+  "Gloomgourd": {
+    "count": 72,
+    "ingredients": {
+      "Pumpkin Seeds": 15,
+      "Melon Seeds": 12
+    }
+  },
+  "Godseed": {
+    "count": 4,
+    "ingredients": {
+      "Potato": 4,
+      "Wheat": 4,
+      "Carrot": 4,
+      "Pumpkin": 3,
+      "Melon": 3,
+      "Wild Rose": 2,
+      "Cocoa Beans": 2,
+      "Cactus": 2,
+      "Sunflower": 2,
+      "Sugar Cane": 2,
+      "Nether Wart": 2,
+      "Red Mushroom": 1
+    }
+  },
+  "Lonelily": {
+    "count": 25,
+    "ingredients": {}
+  },
+  "Magic Jellybean": {
+    "count": 16,
+    "ingredients": {
+      "Sugar Cane": 49,
+      "Duskbloom": 16
+    }
+  },
+  "Noctilume": {
+    "count": 9,
+    "ingredients": {
+      "Lonelily": 38,
+      "Duskbloom": 26
+    }
+  },
+  "Phantomleaf": {
+    "count": 16,
+    "ingredients": {
+      "Shellfruit": 42,
+      "Chorus Fruit": 24
+    }
+  },
+  "Plant Boy Advance": {
+    "count": 4,
+    "ingredients": {
+      "Snoozling": 5,
+      "Thunderling": 17
+    }
+  },
+  "Puffercloud": {
+    "count": 11,
+    "ingredients": {
+      "Do-not-eat-shroom": 41,
+      "Snoozling": 4
+    }
+  },
+  "Scourroot": {
+    "count": 72,
+    "ingredients": {
+      "Potato": 15,
+      "Carrot": 12
+    }
+  },
+  "Shadevine": {
+    "count": 72,
+    "ingredients": {
+      "Cactus": 15,
+      "Sugar Cane": 12
+    }
+  },
+  "Shellfruit": {
+    "count": 84,
+    "ingredients": {
+      "Blastberry": 16,
+      "Turtellini": 84
+    }
+  },
+  "Snoozling": {
+    "count": 4,
+    "ingredients": {
+      "Witherbloom": 12,
+      "Dustgrain": 12,
+      "Creambloom": 10,
+      "Thornshade": 6,
+      "Duskbloom": 6
+    }
+  },
+  "Soggybud": {
+    "count": 52,
+    "ingredients": {
+      "Melon Seeds": 26,
+      "Gloomgourd": 21
+    }
+  },
+  "Startlevine": {
+    "count": 16,
+    "ingredients": {
+      "Cheesebite": 42,
+      "Blastberry": 24
+    }
+  },
+  "Stoplight Petal": {
+    "count": 4,
+    "ingredients": {
+      "Snoozling": 4,
+      "Noctilume": 7
+    }
+  },
+  "Thornshade": {
+    "count": 16,
+    "ingredients": {
+      "Wild Rose": 42,
+      "Veilshroom": 23
+    }
+  },
+  "Thunderling": {
+    "count": 13,
+    "ingredients": {
+      "Soggybud": 41,
+      "Noctilume": 9
+    }
+  },
+  "Timestalk": {
+    "count": 16,
+    "ingredients": {
+      "Shellfruit": 24,
+      "Stoplight Petal": 24,
+      "Chorus Fruit": 18
+    }
+  },
+  "Turtellini": {
+    "count": 16,
+    "ingredients": {
+      "Choconut": 42,
+      "Soggybud": 23
+    }
+  },
+  "Witherbloom": {
+    "count": 52,
+    "ingredients": {
+      "Dead Plants": 48
+    }
+  },
+  "Zombud": {
+    "count": 16,
+    "ingredients": {
+      "Dead Plants": 41,
+      "Cindershade": 14,
+      "Fleshtrap": 12
+    }
+  }
+}
