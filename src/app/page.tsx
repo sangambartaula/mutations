@@ -445,14 +445,24 @@ export default function Home() {
 
             {/* Farming Fortune Slider */}
             <div className="mb-6">
-              <label className="flex justify-between text-sm font-medium mb-2">
+              <label className="flex justify-between items-center text-sm font-medium mb-2">
                 <span>Farming Fortune</span>
-                <span className="text-emerald-600 dark:text-emerald-400">{fortune}</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="4000"
+                  value={fortune}
+                  onChange={(e) => {
+                    const next = Number(e.target.value);
+                    setFortune(Math.max(0, Math.min(4000, Number.isFinite(next) ? next : 0)));
+                  }}
+                  className="w-24 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1 text-right text-emerald-600 dark:text-emerald-400"
+                />
               </label>
               <input
                 type="range"
                 min="0"
-                max="3000"
+                max="4000"
                 step="50"
                 value={fortune}
                 onChange={(e) => setFortune(Number(e.target.value))}
