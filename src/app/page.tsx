@@ -196,6 +196,18 @@ export default function Home() {
   };
 
   const formatYieldCalculation = (math: YieldMath, unitPrice: number) => {
+    const isPlainMutationMath =
+      math.base === 1 &&
+      math.gh_buff === 0 &&
+      math.unique_buff === 0 &&
+      math.wart_buff === 1 &&
+      math.fortune === 1 &&
+      math.special === 1;
+
+    if (isPlainMutationMath) {
+      return `1 base × ${math.limit} total across plots × ${formatCoins(unitPrice)} price`;
+    }
+
     const factors = [
       `${math.base} base`,
       `${math.limit} limit`,
