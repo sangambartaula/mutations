@@ -133,6 +133,16 @@ export default function Home() {
     return new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(num);
   };
 
+  const formatDuration = (hours: number) => {
+    const totalMinutes = Math.max(0, Math.round(hours * 60));
+    const hrs = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+
+    if (hrs === 0) return `${mins}m`;
+    if (mins === 0) return `${hrs}h`;
+    return `${hrs}h ${mins}m`;
+  };
+
 
 
   return (
@@ -303,7 +313,7 @@ export default function Home() {
                 <p className="text-sm text-neutral-500 dark:text-neutral-400">Cycle Time</p>
                 <div className="flex items-center gap-2 mt-1 font-mono text-lg font-medium text-amber-600 dark:text-amber-400">
                   <Clock className="w-5 h-5" />
-                  {Math.floor(data.metadata.cycle_time_hours)}h {Math.round((data.metadata.cycle_time_hours - Math.floor(data.metadata.cycle_time_hours)) * 60)}m
+                  {formatDuration(data.metadata.cycle_time_hours)}
                 </div>
               </div>
             )}
@@ -369,6 +379,7 @@ export default function Home() {
                       <th className="px-6 py-4 font-semibold text-right text-emerald-600 dark:text-emerald-400">
                         {mode === "profit" ? "Profit / Harvest" : mode === "target" ? `${targetCrop} Yield` : "Smart Score"}
                       </th>
+                      <th className="px-6 py-4 font-semibold text-right hidden md:table-cell">Grow Time</th>
                       <th className="px-6 py-4 font-semibold text-right hidden sm:table-cell">Setup Cost</th>
                     </tr>
                   </thead>
@@ -410,6 +421,9 @@ export default function Home() {
                             )}
                             {mode === "smart" ? item.score.toFixed(2) : formatCoins(mode === "target" ? item.score : item.profit)}
                           </div>
+                        </td>
+                        <td className="px-6 py-4 text-right font-mono text-neutral-500 hidden md:table-cell">
+                          {formatDuration(item.breakdown.estimated_time_hours)}
                         </td>
                         <td className="px-6 py-4 text-right font-mono opacity-[0.65] hidden sm:table-cell">
                           {formatCoins(item.opt_cost)}
@@ -473,7 +487,7 @@ export default function Home() {
               <div className="pt-6">
                 <h4 className="font-bold mb-3 flex items-center justify-between text-emerald-700 dark:text-emerald-400">
                   <span>Expected Harvest Yields</span>
-                  <span className="text-sm font-normal text-neutral-500 dark:text-neutral-400">~{data ? Math.floor(data.metadata.cycle_time_hours) : 0}h Cycle</span>
+                  <span className="text-sm font-normal text-neutral-500 dark:text-neutral-400">~{data ? formatDuration(data.metadata.cycle_time_hours) : "0m"} Cycle</span>
                 </h4>
 
                 <div className="p-5 bg-blue-500/10 rounded-2xl border border-blue-500/20 space-y-4">
@@ -498,7 +512,7 @@ export default function Home() {
                   </div>
                   <div className="flex items-center justify-between pt-2 border-t border-blue-500/20">
                     <span className="text-xs font-medium text-blue-600 dark:text-blue-400">Estimated Lifecycle Time:</span>
-                    <span className="text-sm font-black text-blue-700 dark:text-blue-300">{Math.round(selectedMutation.breakdown.estimated_time_hours)} Hours</span>
+                    <span className="text-sm font-black text-blue-700 dark:text-blue-300">{formatDuration(selectedMutation.breakdown.estimated_time_hours)}</span>
                   </div>
                 </div>
 
