@@ -32,6 +32,16 @@ DEFAULT_SPECIAL_MULTIPLIER_BY_MUTATION = {
     "All-in Aloe": 1.8,
 }
 
+SPREAD_WARNING_RATIO = 2.0  # 100% difference => 2x between two prices.
+
+
+def has_wide_spread(price_a: float, price_b: float) -> bool:
+    if price_a <= 0 or price_b <= 0:
+        return False
+    hi = max(price_a, price_b)
+    lo = min(price_a, price_b)
+    return (hi / lo) >= SPREAD_WARNING_RATIO
+
 @app.get("/api/ping")
 def ping():
     return {"status": "ok"}
@@ -137,14 +147,14 @@ def get_leaderboard(
             
             # Warning logic if spread is bad
             ing_market = bazaar_data.get(ing, {"buyPrice": 0, "sellPrice": 0})
-            if ing_market.get('sellPrice', 0) > 0 and (ing_market.get('buyPrice', 0) / ing_market.get('sellPrice', 1)) > 2.0:
+            if has_wide_spread(ing_market.get('buyPrice', 0), ing_market.get('sellPrice', 0)):
                 ing_warning = True
 
         # Fetch Prices for Mutation itself
         mut_sell_price_value = get_item_price(mut_name, False, sell_mode)
         market_data = bazaar_data.get(mut_name, {"buyPrice": 0, "sellPrice": 0})
         mut_warning = False
-        if market_data.get('sellPrice', 0) > 0 and (market_data.get('buyPrice', 0) / market_data.get('sellPrice', 1)) > 2.0:
+        if has_wide_spread(market_data.get('buyPrice', 0), market_data.get('sellPrice', 0)):
             mut_warning = True
             
         # 2. Return per Batch (One Harvest)
