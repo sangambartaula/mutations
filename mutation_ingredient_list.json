@@ -164,7 +164,8 @@
   "Lonelily": {
     "count": 25,
     "ingredients": {},
-    "growth_stages": 1
+    "growth_stages": 1,
+    "mutation_chance_override": 0.02
   },
   "Magic Jellybean": {
     "count": 16,

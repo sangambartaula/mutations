@@ -91,7 +91,7 @@ class LeaderboardTests(unittest.TestCase):
     @patch("api.index.get_bazaar_prices", return_value={"Lonelily": {"buyPrice": 100, "sellPrice": 90}})
     def test_hourly_mode_uses_expected_value_formula(self, _mock_prices):
         plots = 2
-        chance = 0.25
+        default_chance = 0.25
         result = get_leaderboard(
             plots=plots,
             fortune=2500,
@@ -102,7 +102,7 @@ class LeaderboardTests(unittest.TestCase):
             sell_mode="sell_offer",
             target_crop=None,
             maxed_crops="",
-            mutation_chance=chance,
+            mutation_chance=default_chance,
             harvest_mode="full",
             custom_time_hours=24.0,
         )
@@ -111,6 +111,8 @@ class LeaderboardTests(unittest.TestCase):
         self.assertIsNotNone(lonelily)
 
         x = lonelily["breakdown"]["base_limit"]
+        chance = lonelily["hourly"]["mutation_chance"]
+        self.assertAlmostEqual(chance, 0.02, places=6)
         cycle_time_hours = result["metadata"]["cycle_time_hours"]
         t_cycles = math.log(1.0 / x) / math.log(1.0 - chance)
         harvest_time_hours = max(cycle_time_hours, t_cycles * cycle_time_hours)

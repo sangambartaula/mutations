@@ -116,6 +116,7 @@ def get_leaderboard(
         base_limit = m_data.get("count", 1)
         limit = base_limit * plots
         ingredients = m_data.get("ingredients", {})
+        mutation_chance_effective = float(m_data.get("mutation_chance_override", mutation_chance))
         
         # 1. Setup Cost
         opt_cost = 0
@@ -237,14 +238,14 @@ def get_leaderboard(
             harvest_time_hours = custom_time_hours
             completed_cycles = int(harvest_time_hours // cycle_time_hours) if cycle_time_hours > 0 else 0
         else:
-            if base_limit > 1 and mutation_chance < 1:
-                t_cycles = math.log(1.0 / base_limit) / math.log(1.0 - mutation_chance)
+            if base_limit > 1 and mutation_chance_effective < 1:
+                t_cycles = math.log(1.0 / base_limit) / math.log(1.0 - mutation_chance_effective)
             else:
                 t_cycles = 1.0
             harvest_time_hours = max(cycle_time_hours, t_cycles * cycle_time_hours)
             completed_cycles = int(harvest_time_hours // cycle_time_hours) if cycle_time_hours > 0 else 0
 
-        expected_mutations_per_plot = base_limit * (1.0 - ((1.0 - mutation_chance) ** completed_cycles))
+        expected_mutations_per_plot = base_limit * (1.0 - ((1.0 - mutation_chance_effective) ** completed_cycles))
         expected_total_mutations = plots * expected_mutations_per_plot
         expected_mutation_revenue = expected_total_mutations * mut_sell_price_value
         expected_profit = expected_mutation_revenue - opt_cost
@@ -290,7 +291,7 @@ def get_leaderboard(
             "limit": limit,
             "smart_progress": smart_progress,
             "hourly": {
-                "mutation_chance": mutation_chance,
+                "mutation_chance": mutation_chance_effective,
                 "harvest_mode": harvest_mode,
                 "custom_time_hours": custom_time_hours if harvest_mode == "custom_time" else None,
                 "harvest_time_hours": harvest_time_hours,
