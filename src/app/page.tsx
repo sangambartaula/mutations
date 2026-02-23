@@ -52,6 +52,7 @@ type LeaderboardItem = {
   warning: boolean;
   mut_price: number;
   limit: number;
+  smart_progress?: Record<string, number>;
   breakdown: MutationBreakdown;
 };
 
@@ -59,6 +60,7 @@ type LeaderboardResponse = {
   leaderboard: LeaderboardItem[];
   metadata: {
     cycle_time_hours: number;
+    missing_crops?: string[];
   };
 };
 
@@ -77,6 +79,7 @@ export default function Home() {
   const [mode, setMode] = useState<OptimizationMode>("profit");
   const [targetCrop, setTargetCrop] = useState("Wheat");
   const [maxedCrops, setMaxedCrops] = useState<string[]>([]);
+  const [smartTab, setSmartTab] = useState("all");
 
   // New Toggles
   const [setupMode, setSetupMode] = useState<SetupMode>("buy_order");
@@ -93,6 +96,23 @@ export default function Home() {
   const [data, setData] = useState<LeaderboardResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const saved = localStorage.getItem("mutations:maxed-crops");
+    if (!saved) return;
+    try {
+      const parsed: unknown = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        setMaxedCrops(parsed.filter((v): v is string => typeof v === "string"));
+      }
+    } catch {
+      // Ignore malformed local storage data.
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("mutations:maxed-crops", JSON.stringify(maxedCrops));
+  }, [maxedCrops]);
 
   useEffect(() => {
     async function fetchData() {
@@ -158,8 +178,23 @@ export default function Home() {
     }
 
     factors.push(`${formatCoins(unitPrice)} price`);
-    return factors.join(" Ã— ");
+    return factors.join(" × ");
   };
+
+  const missingCrops = mode === "smart" ? (data?.metadata.missing_crops ?? []) : [];
+  const activeSmartTab = missingCrops.includes(smartTab) ? smartTab : "all";
+
+  const visibleSmartCrops = mode === "smart"
+    ? (activeSmartTab === "all" ? missingCrops : [activeSmartTab])
+    : [];
+
+  const visibleLeaderboard = mode === "smart" && data
+    ? data.leaderboard.filter((item) => {
+      const progress = item.smart_progress ?? {};
+      if (activeSmartTab === "all") return Object.keys(progress).length > 0;
+      return (progress[activeSmartTab] ?? 0) > 0;
+    })
+    : (data?.leaderboard ?? []);
 
 
 
@@ -343,48 +378,76 @@ export default function Home() {
 
           {/* CROP MILESTONES SECTION */}
           {mode === "smart" && (
-          <div className="bg-white dark:bg-neutral-900 rounded-2xl p-6 shadow-sm border border-neutral-200 dark:border-neutral-800">
-            <h2 className="text-lg font-semibold flex items-center gap-2 mb-4">
-              <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg">
-                <ArrowUpRight className="w-4 h-4" />
-              </div>
-              Crop Milestones
-            </h2>
-            <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-6">
-              Mark crops as maxed to exclude them from Smart mode priority.
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-              {displayCrops.map(crop => (
+            <div className="bg-white dark:bg-neutral-900 rounded-2xl p-6 shadow-sm border border-neutral-200 dark:border-neutral-800">
+              <h2 className="text-lg font-semibold flex items-center gap-2 mb-4">
+                <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg">
+                  <ArrowUpRight className="w-4 h-4" />
+                </div>
+                Smart Milestones
+              </h2>
+              <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-4">
+                Missing milestone tabs and per-harvest progress. Maxed selections are saved locally.
+              </p>
+
+              <div className="flex flex-wrap gap-2 mb-5" role="tablist" aria-label="Missing milestones">
                 <button
-                  key={crop}
-                  onClick={() => toggleMaxedCrop(crop)}
-                  className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${maxedCrops.includes(crop)
-                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-400'
-                    : 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400'
-                    }`}
+                  role="tab"
+                  aria-selected={activeSmartTab === "all"}
+                  onClick={() => setSmartTab("all")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${activeSmartTab === "all"
+                    ? "bg-emerald-500 text-white border-emerald-500"
+                    : "bg-neutral-50 text-neutral-600 border-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:border-neutral-700"}`}
                 >
-                  <span className="truncate">{crop}</span>
-                  <span
-                    className={`shrink-0 inline-flex items-center justify-center w-4 h-4 rounded-sm border text-[10px] leading-none ${
-                      maxedCrops.includes(crop)
-                        ? "bg-emerald-500 border-emerald-500 text-white"
-                        : "border-blue-500/60 bg-transparent text-transparent"
-                    }`}
-                    aria-hidden="true"
-                  >
-                    ✓
-                  </span>
+                  All Missing
                 </button>
-              ))}
+                {missingCrops.map((crop) => (
+                  <button
+                    key={crop}
+                    role="tab"
+                    aria-selected={activeSmartTab === crop}
+                    onClick={() => setSmartTab(crop)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${activeSmartTab === crop
+                      ? "bg-blue-500 text-white border-blue-500"
+                      : "bg-neutral-50 text-neutral-600 border-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:border-neutral-700"}`}
+                  >
+                    {crop}
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                {displayCrops.map(crop => (
+                  <button
+                    key={crop}
+                    onClick={() => toggleMaxedCrop(crop)}
+                    className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${maxedCrops.includes(crop)
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-400'
+                      : 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400'
+                      }`}
+                    aria-label={`${crop} milestone ${maxedCrops.includes(crop) ? "maxed" : "needed"}`}
+                  >
+                    <span className="truncate">{crop}</span>
+                    <span
+                      className={`shrink-0 inline-flex items-center justify-center w-4 h-4 rounded-sm border text-[10px] leading-none ${
+                        maxedCrops.includes(crop)
+                          ? "bg-emerald-500 border-emerald-500 text-white"
+                          : "border-blue-500/60 bg-transparent text-transparent"
+                      }`}
+                      aria-hidden="true"
+                    >
+                      ✓
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
           )}
 
           <div className="bg-white dark:bg-neutral-900 rounded-2xl shadow-sm border border-neutral-200 dark:border-neutral-800 overflow-hidden">
             <div className="px-6 py-5 border-b border-neutral-200 dark:border-neutral-800 flex justify-between items-center bg-neutral-50/50 dark:bg-neutral-900/50">
               <h2 className="text-lg font-semibold flex items-center gap-2">
                 <Coins className="w-5 h-5 text-amber-500" />
-                {mode === "profit" ? "Profit Leaderboard" : mode === "smart" ? "Smart Value Ranking" : `${targetCrop} Optimization`}
+                {mode === "profit" ? "Profit Leaderboard" : mode === "smart" ? "Smart Milestone Progress" : `${targetCrop} Optimization`}
               </h2>
               {loading && <Loader2 className="w-5 h-5 animate-spin text-emerald-500" />}
             </div>
@@ -400,20 +463,33 @@ export default function Home() {
                   <p>Calculating leaderboard data...</p>
                 </div>
               ) : (
+                mode === "smart" && missingCrops.length === 0 ? (
+                  <div className="p-10 text-center text-neutral-500 dark:text-neutral-400">
+                    All milestone crops are marked as maxed.
+                  </div>
+                ) : (
                 <table className="w-full text-sm text-left">
                   <thead className="text-xs uppercase bg-neutral-100 dark:bg-neutral-800/50 text-neutral-500 dark:text-neutral-400 border-b border-neutral-200 dark:border-neutral-800">
                     <tr>
                       <th className="px-6 py-4 font-semibold w-16 text-center">Rank</th>
                       <th className="px-6 py-4 font-semibold">Mutation Profile</th>
-                      <th className="px-6 py-4 font-semibold text-right text-emerald-600 dark:text-emerald-400">
-                        {mode === "profit" ? "Profit / Harvest" : mode === "target" ? `${targetCrop} Yield` : "Smart Score"}
-                      </th>
+                      {mode === "smart" ? (
+                        visibleSmartCrops.map((crop) => (
+                          <th key={crop} className="px-6 py-4 font-semibold text-right text-blue-600 dark:text-blue-400">
+                            {crop}
+                          </th>
+                        ))
+                      ) : (
+                        <th className="px-6 py-4 font-semibold text-right text-emerald-600 dark:text-emerald-400">
+                          {mode === "profit" ? "Profit / Harvest" : `${targetCrop} Yield`}
+                        </th>
+                      )}
                       <th className="px-6 py-4 font-semibold text-right hidden md:table-cell">Grow Time</th>
                       <th className="px-6 py-4 font-semibold text-right hidden sm:table-cell">Setup Cost</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {data.leaderboard.map((item, idx) => (
+                    {visibleLeaderboard.map((item, idx) => (
                       <tr
                         key={item.mutationName}
                         onClick={() => setSelectedMutation(item)}
@@ -438,19 +514,27 @@ export default function Home() {
                             {idx === 0 && <span className="ml-2 text-[10px] uppercase tracking-wider font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 px-2 py-0.5 rounded-full inline-block mt-1">Top Pick</span>}
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                          <div className="flex items-center justify-end gap-2">
-                            {item.warning && (
-                              <div className="group relative">
-                                <AlertTriangle className="w-4 h-4 text-yellow-500 hover:text-yellow-600" />
-                                <div className="absolute bottom-full right-0 mb-2 w-48 p-2 bg-neutral-900 text-xs text-white rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 text-center font-sans tracking-wide">
-                                  Warning: Spreads are wide. Double check orders!
+                        {mode === "smart" ? (
+                          visibleSmartCrops.map((crop) => (
+                            <td key={`${item.mutationName}-${crop}`} className="px-6 py-4 text-right font-mono font-bold text-blue-600 dark:text-blue-400">
+                              {(item.smart_progress?.[crop] ?? 0).toFixed(1)}%
+                            </td>
+                          ))
+                        ) : (
+                          <td className="px-6 py-4 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                            <div className="flex items-center justify-end gap-2">
+                              {item.warning && (
+                                <div className="group relative">
+                                  <AlertTriangle className="w-4 h-4 text-yellow-500 hover:text-yellow-600" />
+                                  <div className="absolute bottom-full right-0 mb-2 w-48 p-2 bg-neutral-900 text-xs text-white rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 text-center font-sans tracking-wide">
+                                    Warning: Spreads are wide. Double check orders!
+                                  </div>
                                 </div>
-                              </div>
-                            )}
-                            {mode === "smart" ? item.score.toFixed(2) : formatCoins(mode === "target" ? item.score : item.profit)}
-                          </div>
-                        </td>
+                              )}
+                              {formatCoins(mode === "target" ? item.score : item.profit)}
+                            </div>
+                          </td>
+                        )}
                         <td className="px-6 py-4 text-right font-mono text-neutral-500 hidden md:table-cell">
                           {formatDuration(item.breakdown.estimated_time_hours)}
                         </td>
@@ -461,6 +545,7 @@ export default function Home() {
                     ))}
                   </tbody>
                 </table>
+                )
               )}
             </div>
           </div>

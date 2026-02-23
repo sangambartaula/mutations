@@ -57,10 +57,7 @@ def get_leaderboard(
     
     # Parse maxed crops
     maxed_list = [c.strip() for c in maxed_crops.split(",") if c.strip()]
-    active_reqs = {crop: DEFAULT_REQS.get(crop, 20_200_000) for crop in raw_crop_cols if crop not in maxed_list}
-    if "Mushroom" in maxed_list:
-        if "Red Mushroom " in active_reqs: del active_reqs["Red Mushroom "]
-        if "Brown Mushroom" in active_reqs: del active_reqs["Brown Mushroom"]
+    missing_crops = [crop for crop in DEFAULT_REQS.keys() if crop not in maxed_list]
     
     # Cycle Time Math
     base_cycle_hours = 4.0
@@ -208,6 +205,16 @@ def get_leaderboard(
                 }
             })
         
+        crop_yields_by_name = {y["name"]: y["amount"] for y in yields if y["name"] in DEFAULT_REQS}
+        smart_progress = {}
+        for req_crop in missing_crops:
+            req_amt = DEFAULT_REQS.get(req_crop, 0)
+            if req_amt <= 0:
+                continue
+            progress_pct = (crop_yields_by_name.get(req_crop, 0) / req_amt) * 100.0
+            if progress_pct > 0:
+                smart_progress[req_crop] = progress_pct
+
         # 3. Simple Math
         profit_batch = total_cycle_revenue - opt_cost
         
@@ -222,15 +229,9 @@ def get_leaderboard(
                 score = float(cleaned_row.get(target_crop, 0)) * limit * calc_mult * special_mult
             
         elif mode == "smart":
-            smart_score = 0
-            for req_crop, req_amt in active_reqs.items():
-                drop_rate = float(cleaned_row.get(req_crop, 0)) * special_mult
-                if drop_rate > 0:
-                    # Weight by the fraction of the requirement this drop fulfills
-                    weight = 1.0 / req_amt if req_amt > 0 else 0
-                    smart_score += drop_rate * weight
-            # Multiply percentage progress by limit, calc_mult
-            score = smart_score * limit * calc_mult * 10000000 # Scaling factor for readable display score
+            score = sum(smart_progress.values())
+            if score <= 0:
+                continue
             
         breakdown = {
             "base_limit": base_limit,
@@ -251,6 +252,7 @@ def get_leaderboard(
             "warning": mut_warning or ing_warning,
             "mut_price": mut_sell_price_value,
             "limit": limit,
+            "smart_progress": smart_progress,
             "breakdown": breakdown
         })
 
@@ -259,6 +261,7 @@ def get_leaderboard(
     return {
         "leaderboard": leaderboard_data,
         "metadata": {
-            "cycle_time_hours": cycle_time_hours
+            "cycle_time_hours": cycle_time_hours,
+            "missing_crops": missing_crops
         }
     }
