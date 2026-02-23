@@ -4,10 +4,10 @@ import { useState, useEffect, useRef } from "react";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Coins, Sprout, Clock, Calculator, Loader2, ArrowUpRight, AlertTriangle, X } from "lucide-react";
 
-type OptimizationMode = "profit" | "smart" | "target" | "hourly";
+type OptimizationMode = "profit" | "smart" | "target";
 type SetupMode = "buy_order" | "insta_buy";
 type SellMode = "sell_offer" | "insta_sell";
-type SortKey = "rank" | "mutation" | "value" | "profitCycle" | "cycles" | "setup";
+type SortKey = "rank" | "mutation" | "value" | "profitCycle" | "profitHour" | "cycles" | "setup";
 type SortDirection = "asc" | "desc";
 
 type YieldMath = {
@@ -72,7 +72,6 @@ const optimizationModes: { id: OptimizationMode; label: string }[] = [
   { id: "profit", label: "Pure Profit" },
   { id: "smart", label: "Smart (Milestones)" },
   { id: "target", label: "Focus One Crop" },
-  { id: "hourly", label: "Profit / Hour" },
 ];
 
 const cropLabelMap: Record<string, string> = {
@@ -98,9 +97,6 @@ export default function Home() {
   // New Toggles
   const [setupMode, setSetupMode] = useState<SetupMode>("buy_order");
   const [sellMode, setSellMode] = useState<SellMode>("sell_offer");
-  const [mutationChance, setMutationChance] = useState(25);
-  const [harvestMode, setHarvestMode] = useState<"full" | "custom_time">("full");
-  const [customTimeHours, setCustomTimeHours] = useState(24);
 
   // Modal State
   const [selectedMutation, setSelectedMutation] = useState<LeaderboardItem | null>(null);
@@ -156,9 +152,6 @@ export default function Home() {
           mode: mode,
           setup_mode: setupMode,
           sell_mode: sellMode,
-          mutation_chance: (mutationChance / 100).toString(),
-          harvest_mode: harvestMode,
-          custom_time_hours: customTimeHours.toString(),
           maxed_crops: maxedCrops.join(","),
           ...(mode === "target" && { target_crop: targetCrop })
         });
@@ -173,7 +166,7 @@ export default function Home() {
       }
     }
     fetchData();
-  }, [plots, fortune, ghUpgrade, uniqueCrops, mode, setupMode, sellMode, mutationChance, harvestMode, customTimeHours, targetCrop, maxedCrops]);
+  }, [plots, fortune, ghUpgrade, uniqueCrops, mode, setupMode, sellMode, targetCrop, maxedCrops]);
 
   const toggleMaxedCrop = (crop: string) => {
     setMaxedCrops(prev =>
@@ -254,8 +247,8 @@ export default function Home() {
     if (key === "cycles") return item.breakdown.growth_stages;
     if (key === "setup") return item.opt_cost;
     if (key === "profitCycle") return item.profit_per_cycle ?? 0;
+    if (key === "profitHour") return item.profit_per_hour ?? 0;
     if (key === "value") {
-      if (mode === "hourly") return item.profit_per_hour ?? 0;
       if (mode === "smart") {
         if (activeSmartTab !== "all") return item.smart_progress?.[activeSmartTab] ?? 0;
         return item.score;
@@ -351,58 +344,6 @@ export default function Home() {
               </div>
             )}
 
-            {mode === "hourly" && (
-              <div className="mb-6 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                <div>
-                  <label className="text-sm font-medium mb-2 block text-emerald-600 dark:text-emerald-400">Mutation Chance Per Cycle</label>
-                  <label className="flex justify-between text-sm mb-2">
-                    <span>Spawn Chance</span>
-                    <span className="text-emerald-600 dark:text-emerald-400">{mutationChance}%</span>
-                  </label>
-                  <input
-                    type="range"
-                    min="1"
-                    max="90"
-                    value={mutationChance}
-                    onChange={(e) => setMutationChance(Number(e.target.value))}
-                    className="w-full accent-emerald-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-2 block text-emerald-600 dark:text-emerald-400">Harvest Mode</label>
-                  <div className="flex bg-neutral-100 dark:bg-neutral-800 rounded-xl p-1">
-                    <button
-                      onClick={() => setHarvestMode("full")}
-                      className={`flex-1 text-xs py-1.5 rounded-lg transition-colors ${harvestMode === "full" ? "bg-white dark:bg-neutral-700 shadow-sm font-medium" : "text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"}`}
-                    >
-                      Fill Setup
-                    </button>
-                    <button
-                      onClick={() => setHarvestMode("custom_time")}
-                      className={`flex-1 text-xs py-1.5 rounded-lg transition-colors ${harvestMode === "custom_time" ? "bg-white dark:bg-neutral-700 shadow-sm font-medium" : "text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"}`}
-                    >
-                      Custom Time
-                    </button>
-                  </div>
-                </div>
-                {harvestMode === "custom_time" && (
-                  <div>
-                    <label className="flex justify-between text-sm font-medium mb-2">
-                      <span>Custom Time</span>
-                      <span className="text-emerald-600 dark:text-emerald-400">{customTimeHours}h</span>
-                    </label>
-                    <input
-                      type="range"
-                      min="1"
-                      max="72"
-                      value={customTimeHours}
-                      onChange={(e) => setCustomTimeHours(Number(e.target.value))}
-                      className="w-full accent-emerald-500"
-                    />
-                  </div>
-                )}
-              </div>
-            )}
 
             <hr className="my-6 border-neutral-100 dark:border-neutral-800" />
 
@@ -604,9 +545,7 @@ export default function Home() {
                   ? "Profit Leaderboard"
                   : mode === "smart"
                     ? "Smart Milestone Progress"
-                    : mode === "hourly"
-                      ? "Profit Per Hour Leaderboard"
-                      : `${targetCrop} Optimization`}
+                    : `${targetCrop} Optimization`}
               </h2>
               <div className="flex items-center gap-2">
                 {mode === "smart" && visibleSmartCrops.length > 6 && (
@@ -657,7 +596,7 @@ export default function Home() {
                       ) : (
                         <th className="px-6 py-4 font-semibold text-right text-emerald-600 dark:text-emerald-400">
                           <button type="button" onClick={() => toggleSort("value")} className="inline-flex items-center gap-1">
-                            {mode === "profit" ? "Profit / Harvest" : mode === "hourly" ? "Profit / Hour" : `${targetCrop} Yield`} <span aria-hidden="true">{sortIndicator("value")}</span>
+                            {mode === "profit" ? "Profit / Harvest" : `${targetCrop} Yield`} <span aria-hidden="true">{sortIndicator("value")}</span>
                           </button>
                         </th>
                       )}
@@ -666,6 +605,13 @@ export default function Home() {
                           Profit / Cycle <span aria-hidden="true">{sortIndicator("profitCycle")}</span>
                         </button>
                       </th>
+                      {mode === "profit" && (
+                        <th className="px-6 py-4 font-semibold text-right hidden xl:table-cell text-emerald-600 dark:text-emerald-400">
+                          <button type="button" onClick={() => toggleSort("profitHour")} className="inline-flex items-center gap-1">
+                            Profit / Hour <span aria-hidden="true">{sortIndicator("profitHour")}</span>
+                          </button>
+                        </th>
+                      )}
                       <th className="px-6 py-4 font-semibold text-right hidden md:table-cell">
                         <button type="button" onClick={() => toggleSort("cycles")} className="inline-flex items-center gap-1">
                           Growth Cycles <span aria-hidden="true">{sortIndicator("cycles")}</span>
@@ -724,13 +670,18 @@ export default function Home() {
                                   </div>
                                 </div>
                               )}
-                              {formatCoins(mode === "target" ? item.score : mode === "hourly" ? item.profit_per_hour : item.profit)}
+                              {formatCoins(mode === "target" ? item.score : item.profit)}
                             </div>
                           </td>
                         )}
                         <td className="px-6 py-4 text-right font-mono hidden lg:table-cell text-emerald-600 dark:text-emerald-400">
                           {formatCoins(item.profit_per_cycle)}
                         </td>
+                        {mode === "profit" && (
+                          <td className="px-6 py-4 text-right font-mono hidden xl:table-cell text-emerald-600 dark:text-emerald-400">
+                            {formatCoins(item.profit_per_hour)}
+                          </td>
+                        )}
                         <td className="px-6 py-4 text-right font-mono text-neutral-500 hidden md:table-cell">
                           {item.breakdown.growth_stages} Cycles
                         </td>
