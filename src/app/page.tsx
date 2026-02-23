@@ -748,6 +748,10 @@ export default function Home() {
               )}
             </div>
           </div>
+
+          <div className="rounded-xl border border-amber-200/70 bg-amber-50/80 px-4 py-3 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
+            Results are based on community-tested assumptions, and some crop behaviors may still be uncertain. Verify key values in-game before placing large orders.
+          </div>
         </main>
       </div>
 
