@@ -298,6 +298,14 @@
     },
     "growth_stages": 1
   },
+  "Veilshroom": {
+    "count": 52,
+    "ingredients": {
+      "Red Mushroom": 1,
+      "Brown Mushroom": 1
+    },
+    "growth_stages": 0
+  },
   "Witherbloom": {
     "count": 52,
     "ingredients": {

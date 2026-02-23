@@ -217,6 +217,7 @@ def get_leaderboard(
 
         # 3. Simple Math
         profit_batch = total_cycle_revenue - opt_cost
+        profit_per_cycle = (profit_batch / estimated_time) if estimated_time > 0 else 0.0
         
         # 4. Scoring Logic
         score = 0
@@ -247,6 +248,7 @@ def get_leaderboard(
             "mutationName": mut_name,
             "score": score,
             "profit": profit_batch,
+            "profit_per_cycle": profit_per_cycle,
             "opt_cost": opt_cost,
             "revenue": total_cycle_revenue,
             "warning": mut_warning or ing_warning,

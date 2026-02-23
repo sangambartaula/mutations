@@ -7,7 +7,7 @@ import { Coins, Sprout, Clock, Calculator, Loader2, ArrowUpRight, AlertTriangle,
 type OptimizationMode = "profit" | "smart" | "target";
 type SetupMode = "buy_order" | "insta_buy";
 type SellMode = "sell_offer" | "insta_sell";
-type SortKey = "rank" | "mutation" | "value" | "cycles" | "setup";
+type SortKey = "rank" | "mutation" | "value" | "profitCycle" | "cycles" | "setup";
 type SortDirection = "asc" | "desc";
 
 type YieldMath = {
@@ -49,6 +49,7 @@ type LeaderboardItem = {
   mutationName: string;
   score: number;
   profit: number;
+  profit_per_cycle: number;
   opt_cost: number;
   revenue: number;
   warning: boolean;
@@ -213,6 +214,7 @@ export default function Home() {
     if (key === "mutation") return item.mutationName.toLowerCase();
     if (key === "cycles") return item.breakdown.growth_stages;
     if (key === "setup") return item.opt_cost;
+    if (key === "profitCycle") return item.profit_per_cycle ?? 0;
     if (key === "value") {
       if (mode === "smart") {
         if (activeSmartTab !== "all") return item.smart_progress?.[activeSmartTab] ?? 0;
@@ -538,6 +540,11 @@ export default function Home() {
                           </button>
                         </th>
                       )}
+                      <th className="px-6 py-4 font-semibold text-right hidden lg:table-cell text-emerald-600 dark:text-emerald-400">
+                        <button type="button" onClick={() => toggleSort("profitCycle")} className="inline-flex items-center gap-1">
+                          Profit / Cycle <span aria-hidden="true">{sortIndicator("profitCycle")}</span>
+                        </button>
+                      </th>
                       <th className="px-6 py-4 font-semibold text-right hidden md:table-cell">
                         <button type="button" onClick={() => toggleSort("cycles")} className="inline-flex items-center gap-1">
                           Growth Cycles <span aria-hidden="true">{sortIndicator("cycles")}</span>
@@ -597,6 +604,9 @@ export default function Home() {
                             </div>
                           </td>
                         )}
+                        <td className="px-6 py-4 text-right font-mono hidden lg:table-cell text-emerald-600 dark:text-emerald-400">
+                          {formatCoins(item.profit_per_cycle)}
+                        </td>
                         <td className="px-6 py-4 text-right font-mono text-neutral-500 hidden md:table-cell">
                           {item.breakdown.growth_stages} Cycles ({formatDuration(item.breakdown.estimated_time_hours)})
                         </td>
