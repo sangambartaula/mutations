@@ -46,8 +46,20 @@ def get_leaderboard(
     setup_mode: str = Query("insta_buy"), # "insta_buy" or "buy_order"
     sell_mode: str = Query("sell_offer"), # "insta_sell" or "sell_offer"
     target_crop: str = Query(None),
-    maxed_crops: str = Query("")  # Comma-separated list
+    maxed_crops: str = Query(""),  # Comma-separated list
+    mutation_chance: float = Query(0.25, gt=0.0, lt=1.0),
+    harvest_mode: str = Query("full"),  # "full" or "custom_time"
+    custom_time_hours: float = Query(24.0, gt=0.0)
 ) -> Dict[str, Any]:
+    # Normalize FastAPI Query defaults when function is called directly in tests/scripts.
+    if not isinstance(maxed_crops, str):
+        maxed_crops = ""
+    if not isinstance(mutation_chance, (int, float)):
+        mutation_chance = 0.25
+    if not isinstance(harvest_mode, str):
+        harvest_mode = "full"
+    if not isinstance(custom_time_hours, (int, float)):
+        custom_time_hours = 24.0
     
     # Load Data
     bazaar_data = get_bazaar_prices()
@@ -218,6 +230,24 @@ def get_leaderboard(
         # 3. Simple Math
         profit_batch = total_cycle_revenue - opt_cost
         profit_per_cycle = (profit_batch / estimated_time) if estimated_time > 0 else 0.0
+
+        # Deterministic expected-value model for mutation-spawn profitability over time.
+        if harvest_mode == "custom_time":
+            harvest_time_hours = custom_time_hours
+            completed_cycles = int(harvest_time_hours // cycle_time_hours) if cycle_time_hours > 0 else 0
+        else:
+            if base_limit > 1 and mutation_chance < 1:
+                t_cycles = math.log(1.0 / base_limit) / math.log(1.0 - mutation_chance)
+            else:
+                t_cycles = 1.0
+            harvest_time_hours = max(cycle_time_hours, t_cycles * cycle_time_hours)
+            completed_cycles = int(harvest_time_hours // cycle_time_hours) if cycle_time_hours > 0 else 0
+
+        expected_mutations_per_plot = base_limit * (1.0 - ((1.0 - mutation_chance) ** completed_cycles))
+        expected_total_mutations = plots * expected_mutations_per_plot
+        expected_mutation_revenue = expected_total_mutations * mut_sell_price_value
+        expected_profit = expected_mutation_revenue - opt_cost
+        profit_per_hour = (expected_profit / harvest_time_hours) if harvest_time_hours > 0 else 0.0
         
         # 4. Scoring Logic
         score = 0
@@ -233,6 +263,8 @@ def get_leaderboard(
             score = sum(smart_progress.values())
             if score <= 0:
                 continue
+        elif mode == "hourly":
+            score = profit_per_hour
             
         breakdown = {
             "base_limit": base_limit,
@@ -249,12 +281,23 @@ def get_leaderboard(
             "score": score,
             "profit": profit_batch,
             "profit_per_cycle": profit_per_cycle,
+            "profit_per_hour": profit_per_hour,
             "opt_cost": opt_cost,
             "revenue": total_cycle_revenue,
             "warning": mut_warning or ing_warning,
             "mut_price": mut_sell_price_value,
             "limit": limit,
             "smart_progress": smart_progress,
+            "hourly": {
+                "mutation_chance": mutation_chance,
+                "harvest_mode": harvest_mode,
+                "custom_time_hours": custom_time_hours if harvest_mode == "custom_time" else None,
+                "harvest_time_hours": harvest_time_hours,
+                "completed_cycles": completed_cycles,
+                "expected_mutations": expected_total_mutations,
+                "expected_revenue": expected_mutation_revenue,
+                "expected_profit": expected_profit
+            },
             "breakdown": breakdown
         })
 
