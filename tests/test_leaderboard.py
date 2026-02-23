@@ -67,7 +67,7 @@ class LeaderboardTests(unittest.TestCase):
             self.assertAlmostEqual(mutation["profit_per_cycle"], expected, places=6)
 
     @patch("api.index.get_bazaar_prices", return_value={})
-    def test_all_in_aloe_uses_60x_special_multiplier_at_stage_14(self, _mock_prices):
+    def test_all_in_aloe_uses_reset_adjusted_special_multiplier_at_stage_14(self, _mock_prices):
         result = get_leaderboard(
             plots=3,
             fortune=2500,
@@ -86,7 +86,7 @@ class LeaderboardTests(unittest.TestCase):
 
         sunflower = next((y for y in aloe["breakdown"]["yields"] if y["name"] == "Sunflower"), None)
         self.assertIsNotNone(sunflower)
-        self.assertEqual(sunflower["math"]["special"], 60.0)
+        self.assertEqual(sunflower["math"]["special"], 9.37)
 
     @patch("api.index.get_bazaar_prices", return_value={"Lonelily": {"buyPrice": 100, "sellPrice": 90}})
     def test_hourly_mode_uses_expected_value_formula(self, _mock_prices):

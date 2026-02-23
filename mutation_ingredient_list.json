@@ -3,6 +3,7 @@
     "count": 16,
     "growth_stages": 14,
     "special_multiplier": 60.0,
+    "effective_special_multiplier": 9.37,
     "ingredients": {
       "Magic Jellybean": 44,
       "Plant Boy Advance": 9

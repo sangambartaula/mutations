@@ -152,6 +152,7 @@ def get_leaderboard(
         # Growth stage and special multiplier can be overridden per mutation in mutation_ingredient_list.json
         growth_stages = max(1, int(m_data.get("growth_stages", DEFAULT_GROWTH_STAGE_BY_MUTATION.get(mut_name, 30))))
         special_mult = float(m_data.get("special_multiplier", DEFAULT_SPECIAL_MULTIPLIER_BY_MUTATION.get(mut_name, 1.0)))
+        effective_special_mult = float(m_data.get("effective_special_multiplier", special_mult))
             
         estimated_time = growth_stages * cycle_time_hours
         
@@ -164,9 +165,9 @@ def get_leaderboard(
             if base_drop > 0:
                 full_drops = base_drop * limit * calc_mult
                 
-                expected_drops = (full_drops * special_mult)
+                expected_drops = (full_drops * effective_special_mult)
                 bd_display = base_drop
-                sm_display = special_mult
+                sm_display = effective_special_mult
                     
                 crop_price = get_item_price(crop_col, False, sell_mode)
                 if crop_col == "Red Mushroom " or crop_col == "Brown Mushroom": crop_price = 10
@@ -255,9 +256,9 @@ def get_leaderboard(
             score = profit_batch
         elif mode == "target" and target_crop:
             if target_crop == "Mushroom":
-                score = (float(cleaned_row.get("Red Mushroom ", 0)) + float(cleaned_row.get("Brown Mushroom", 0))) * limit * calc_mult * special_mult
+                score = (float(cleaned_row.get("Red Mushroom ", 0)) + float(cleaned_row.get("Brown Mushroom", 0))) * limit * calc_mult * effective_special_mult
             else:
-                score = float(cleaned_row.get(target_crop, 0)) * limit * calc_mult * special_mult
+                score = float(cleaned_row.get(target_crop, 0)) * limit * calc_mult * effective_special_mult
             
         elif mode == "smart":
             score = sum(smart_progress.values())
