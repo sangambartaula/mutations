@@ -1,14 +1,22 @@
 ﻿"use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Coins, Sprout, Clock, Calculator, Loader2, ArrowUpRight, AlertTriangle, X } from "lucide-react";
+import {
+  computeProfitHrAFK,
+  computeProfitHrASAP,
+  deriveHarvestStagesFromHours,
+} from "@/lib/mutation-profit-calculator";
+import { applyFortuneChange, syncFortunesOnToggle } from "@/lib/fortune-link";
 
 type OptimizationMode = "profit" | "smart" | "target";
 type SetupMode = "buy_order" | "insta_buy";
 type SellMode = "sell_offer" | "insta_sell";
 type SortKey = "rank" | "mutation" | "value" | "profitCycle" | "profitHour" | "cycles" | "setup";
 type SortDirection = "asc" | "desc";
+type HarvestMode = "afk" | "asap";
+type AfkInputMode = "stages" | "hours";
 
 type YieldMath = {
   base: number;
@@ -57,6 +65,9 @@ type LeaderboardItem = {
   mut_price: number;
   limit: number;
   smart_progress?: Record<string, number>;
+  hourly?: {
+    mutation_chance?: number;
+  };
   breakdown: MutationBreakdown;
 };
 
@@ -84,6 +95,17 @@ const toCropLabel = (crop: string) => cropLabelMap[crop] ?? crop;
 export default function Home() {
   const [plots, setPlots] = useState(3);
   const [fortune, setFortune] = useState(2500);
+  const [harvestMode, setHarvestMode] = useState<HarvestMode>("afk");
+  const [afkInputMode, setAfkInputMode] = useState<AfkInputMode>("stages");
+  const [afkStages, setAfkStages] = useState(16);
+  const [afkHours, setAfkHours] = useState(24);
+  const [fortuneAfk, setFortuneAfk] = useState(2500);
+  const [fortuneAsap, setFortuneAsap] = useState(2500);
+  const [useSameFortune, setUseSameFortune] = useState(true);
+  const [buffCostAfkPerHarvest, setBuffCostAfkPerHarvest] = useState(0);
+  const [buffCostAsapPerHour, setBuffCostAsapPerHour] = useState(0);
+  const [extraSetupCost, setExtraSetupCost] = useState(0);
+  const [asapSetupAmortizeHours, setAsapSetupAmortizeHours] = useState(24);
   const [ghUpgrade, setGhUpgrade] = useState(9);
   const [uniqueCrops, setUniqueCrops] = useState(12);
 
@@ -140,6 +162,12 @@ export default function Home() {
   }, [maxedCrops]);
 
   useEffect(() => {
+    const synced = syncFortunesOnToggle(useSameFortune, { fortuneAfk, fortuneAsap });
+    if (synced.fortuneAfk !== fortuneAfk) setFortuneAfk(synced.fortuneAfk);
+    if (synced.fortuneAsap !== fortuneAsap) setFortuneAsap(synced.fortuneAsap);
+  }, [useSameFortune, fortuneAfk, fortuneAsap]);
+
+  useEffect(() => {
     async function fetchData() {
       setLoading(true);
       setError("");
@@ -175,11 +203,13 @@ export default function Home() {
   };
 
   const formatCoins = (num: number) => {
-    return new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(num);
+    const safe = Number.isFinite(num) ? num : 0;
+    return new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(safe);
   };
 
   const formatDuration = (hours: number) => {
-    const totalMinutes = Math.max(0, Math.round(hours * 60));
+    const safeHours = Number.isFinite(hours) ? hours : 0;
+    const totalMinutes = Math.max(0, Math.round(safeHours * 60));
     const hrs = Math.floor(totalMinutes / 60);
     const mins = totalMinutes % 60;
 
@@ -225,13 +255,98 @@ export default function Home() {
     ? (activeSmartTab === "all" ? missingCrops : [activeSmartTab])
     : [];
 
-  const visibleLeaderboard = mode === "smart" && data
-    ? data.leaderboard.filter((item) => {
+  const visibleLeaderboard = useMemo(() => {
+    if (!(mode === "smart" && data)) return data?.leaderboard ?? [];
+    return data.leaderboard.filter((item) => {
       const progress = item.smart_progress ?? {};
       if (activeSmartTab === "all") return Object.keys(progress).length > 0;
       return (progress[activeSmartTab] ?? 0) > 0;
-    })
-    : (data?.leaderboard ?? []);
+    });
+  }, [mode, data, activeSmartTab]);
+
+  const afkStagesDerived = afkInputMode === "stages"
+    ? Math.max(0, Math.floor(afkStages))
+    : deriveHarvestStagesFromHours(afkHours, data?.metadata.cycle_time_hours ?? 0);
+
+  const mutationProfitByName = useMemo(() => {
+    const cycleTime = data?.metadata.cycle_time_hours ?? 0;
+    const map: Record<string, {
+      expectedMutations: number;
+      revenue: number;
+      costs: number;
+      net: number;
+      profitHr: number;
+      harvestHours: number;
+      stages: number;
+    }> = {};
+
+    for (const item of visibleLeaderboard) {
+      const chance = item.hourly?.mutation_chance ?? 0.25;
+      const slotsPerPlot = Math.max(0, item.breakdown.base_limit);
+      const itemPrice = Math.max(0, item.mut_price);
+      const baseItems = 1;
+      const setupCost = Math.max(0, item.opt_cost + extraSetupCost);
+
+      if (harvestMode === "asap") {
+        const asap = computeProfitHrASAP({
+          plots,
+          slotsPerPlot,
+          mutationChance: chance,
+          stageDurationHours: cycleTime,
+          fortune: fortuneAsap,
+          baseItems,
+          itemPrice,
+          buffCostPerHour: buffCostAsapPerHour,
+          setupCost,
+          setupAmortizeHours: asapSetupAmortizeHours,
+        });
+        map[item.mutationName] = {
+          expectedMutations: asap.expectedMutationsPerStage,
+          revenue: asap.revenuePerHour,
+          costs: asap.costsPerHour,
+          net: asap.netProfitPerHour,
+          profitHr: asap.netProfitPerHour,
+          harvestHours: cycleTime,
+          stages: 1,
+        };
+      } else {
+        const afk = computeProfitHrAFK({
+          plots,
+          slotsPerPlot,
+          mutationChance: chance,
+          stageDurationHours: cycleTime,
+          harvestStages: afkStagesDerived,
+          fortune: fortuneAfk,
+          baseItems,
+          itemPrice,
+          setupCost,
+          buffCostPerHarvest: buffCostAfkPerHarvest,
+        });
+        map[item.mutationName] = {
+          expectedMutations: afk.expectedMutationsByHarvest,
+          revenue: afk.revenueByHarvest,
+          costs: afk.costsByHarvest,
+          net: afk.netProfitByHarvest,
+          profitHr: afk.netProfitPerHour,
+          harvestHours: afk.harvestTimeHours,
+          stages: afkStagesDerived,
+        };
+      }
+    }
+    return map;
+  }, [
+    data?.metadata.cycle_time_hours,
+    visibleLeaderboard,
+    harvestMode,
+    plots,
+    fortuneAfk,
+    fortuneAsap,
+    buffCostAfkPerHarvest,
+    buffCostAsapPerHour,
+    extraSetupCost,
+    asapSetupAmortizeHours,
+    afkStagesDerived,
+  ]);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -247,7 +362,10 @@ export default function Home() {
     if (key === "cycles") return item.breakdown.growth_stages;
     if (key === "setup") return item.opt_cost;
     if (key === "profitCycle") return item.profit_per_cycle ?? 0;
-    if (key === "profitHour") return item.profit_per_hour ?? 0;
+    if (key === "profitHour") {
+      if (mode === "profit") return mutationProfitByName[item.mutationName]?.profitHr ?? 0;
+      return item.profit_per_hour ?? 0;
+    }
     if (key === "value") {
       if (mode === "smart") {
         if (activeSmartTab !== "all") return item.smart_progress?.[activeSmartTab] ?? 0;
@@ -279,6 +397,8 @@ export default function Home() {
     if (!tableScrollRef.current) return;
     tableScrollRef.current.scrollBy({ left: pixels, behavior: "smooth" });
   };
+
+  const selectedMutationModel = selectedMutation ? mutationProfitByName[selectedMutation.mutationName] : null;
 
 
 
@@ -422,6 +542,157 @@ export default function Home() {
                 className="w-full accent-emerald-500"
               />
             </div>
+
+            {mode === "profit" && (
+              <div className="mb-6 rounded-xl border border-blue-200 dark:border-blue-900/40 bg-blue-50/60 dark:bg-blue-950/20 p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">Mutation Profit / Hour</p>
+                  <div className="flex rounded-lg border border-blue-300 dark:border-blue-700 overflow-hidden text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setHarvestMode("afk")}
+                      className={`px-2 py-1 ${harvestMode === "afk" ? "bg-blue-600 text-white" : "bg-transparent text-blue-700 dark:text-blue-300"}`}
+                    >
+                      AFK
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setHarvestMode("asap")}
+                      className={`px-2 py-1 ${harvestMode === "asap" ? "bg-blue-600 text-white" : "bg-transparent text-blue-700 dark:text-blue-300"}`}
+                    >
+                      ASAP
+                    </button>
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-blue-800/80 dark:text-blue-200/80">
+                  AFK uses setup cost once per harvest window. ASAP amortizes setup cost over the hours below.
+                </p>
+
+                {harvestMode === "afk" ? (
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium block">AFK Harvest Input</label>
+                    <div className="flex bg-white/70 dark:bg-neutral-900/50 rounded-lg p-1 border border-blue-200 dark:border-blue-900/40 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setAfkInputMode("stages")}
+                        className={`flex-1 rounded-md py-1 ${afkInputMode === "stages" ? "bg-blue-600 text-white" : "text-blue-700 dark:text-blue-300"}`}
+                      >
+                        After N Stages
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAfkInputMode("hours")}
+                        className={`flex-1 rounded-md py-1 ${afkInputMode === "hours" ? "bg-blue-600 text-white" : "text-blue-700 dark:text-blue-300"}`}
+                      >
+                        After T Hours
+                      </button>
+                    </div>
+                    {afkInputMode === "stages" ? (
+                      <input
+                        type="number"
+                        min="0"
+                        value={afkStages}
+                        onChange={(e) => setAfkStages(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+                        className="w-full bg-white dark:bg-neutral-800 border border-blue-200 dark:border-blue-900/40 rounded-lg px-3 py-1.5 text-sm"
+                      />
+                    ) : (
+                      <>
+                        <input
+                          type="number"
+                          min="0"
+                          value={afkHours}
+                          onChange={(e) => setAfkHours(Math.max(0, Number(e.target.value) || 0))}
+                          className="w-full bg-white dark:bg-neutral-800 border border-blue-200 dark:border-blue-900/40 rounded-lg px-3 py-1.5 text-sm"
+                        />
+                        <p className="text-[11px] text-blue-800/80 dark:text-blue-200/80">
+                          Derived stages: {afkStagesDerived}
+                        </p>
+                      </>
+                    )}
+                  </div>
+                ) : null}
+
+                <div className="space-y-2">
+                  <label className="inline-flex items-center gap-2 text-xs font-medium">
+                    <input
+                      type="checkbox"
+                      checked={useSameFortune}
+                      onChange={(e) => setUseSameFortune(e.target.checked)}
+                      className="accent-blue-600"
+                    />
+                    Use same fortune for both
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      max="4000"
+                      value={fortuneAfk}
+                      onChange={(e) => {
+                        const next = applyFortuneChange("afk", Number(e.target.value), useSameFortune, { fortuneAfk, fortuneAsap });
+                        setFortuneAfk(next.fortuneAfk);
+                        setFortuneAsap(next.fortuneAsap);
+                      }}
+                      className="w-full bg-white dark:bg-neutral-800 border border-blue-200 dark:border-blue-900/40 rounded-lg px-3 py-1.5 text-sm"
+                      aria-label="Fortune AFK"
+                    />
+                    <input
+                      type="number"
+                      min="0"
+                      max="4000"
+                      value={fortuneAsap}
+                      onChange={(e) => {
+                        const next = applyFortuneChange("asap", Number(e.target.value), useSameFortune, { fortuneAfk, fortuneAsap });
+                        setFortuneAfk(next.fortuneAfk);
+                        setFortuneAsap(next.fortuneAsap);
+                      }}
+                      className="w-full bg-white dark:bg-neutral-800 border border-blue-200 dark:border-blue-900/40 rounded-lg px-3 py-1.5 text-sm"
+                      aria-label="Fortune ASAP"
+                      disabled={useSameFortune}
+                    />
+                  </div>
+                  <p className="text-[11px] text-blue-800/80 dark:text-blue-200/80">Left: Fortune (AFK), Right: Fortune (ASAP)</p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-2">
+                  <label className="text-xs font-medium">Buff Cost (AFK, per harvest)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={buffCostAfkPerHarvest}
+                    onChange={(e) => setBuffCostAfkPerHarvest(Math.max(0, Number(e.target.value) || 0))}
+                    className="w-full bg-white dark:bg-neutral-800 border border-blue-200 dark:border-blue-900/40 rounded-lg px-3 py-1.5 text-sm"
+                  />
+
+                  <label className="text-xs font-medium">Buff Cost (ASAP, per hour)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={buffCostAsapPerHour}
+                    onChange={(e) => setBuffCostAsapPerHour(Math.max(0, Number(e.target.value) || 0))}
+                    className="w-full bg-white dark:bg-neutral-800 border border-blue-200 dark:border-blue-900/40 rounded-lg px-3 py-1.5 text-sm"
+                  />
+
+                  <label className="text-xs font-medium">Extra Setup Cost (coins)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={extraSetupCost}
+                    onChange={(e) => setExtraSetupCost(Math.max(0, Number(e.target.value) || 0))}
+                    className="w-full bg-white dark:bg-neutral-800 border border-blue-200 dark:border-blue-900/40 rounded-lg px-3 py-1.5 text-sm"
+                  />
+                  <label className="text-xs font-medium">ASAP Setup Amortize Hours</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={asapSetupAmortizeHours}
+                    onChange={(e) => setAsapSetupAmortizeHours(Math.max(0, Number(e.target.value) || 0))}
+                    className="w-full bg-white dark:bg-neutral-800 border border-blue-200 dark:border-blue-900/40 rounded-lg px-3 py-1.5 text-sm"
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Greenhouse Upgrade Slider */}
             <div className="mb-6">
@@ -608,7 +879,7 @@ export default function Home() {
                       {mode === "profit" && (
                         <th className="px-6 py-4 font-semibold text-right hidden xl:table-cell text-emerald-600 dark:text-emerald-400">
                           <button type="button" onClick={() => toggleSort("profitHour")} className="inline-flex items-center gap-1">
-                            Profit / Hour <span aria-hidden="true">{sortIndicator("profitHour")}</span>
+                            Mutation Profit / Hour <span aria-hidden="true">{sortIndicator("profitHour")}</span>
                           </button>
                         </th>
                       )}
@@ -679,7 +950,7 @@ export default function Home() {
                         </td>
                         {mode === "profit" && (
                           <td className="px-6 py-4 text-right font-mono hidden xl:table-cell text-emerald-600 dark:text-emerald-400">
-                            {formatCoins(item.profit_per_hour)}
+                            {formatCoins(mutationProfitByName[item.mutationName]?.profitHr ?? 0)}
                           </td>
                         )}
                         <td className="px-6 py-4 text-right font-mono text-neutral-500 hidden md:table-cell">
@@ -783,6 +1054,37 @@ export default function Home() {
                     <span className="text-sm font-black text-blue-700 dark:text-blue-300">{formatDuration(selectedMutation.breakdown.estimated_time_hours)}</span>
                   </div>
                 </div>
+
+                {mode === "profit" && selectedMutationModel && (
+                  <div className="mt-4 p-4 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-emerald-700 dark:text-emerald-300">Harvest Mode</span>
+                      <span className="font-mono text-emerald-700 dark:text-emerald-300">
+                        {harvestMode === "afk" ? "AFK (harvest all at once)" : "ASAP (harvest when ready)"}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs font-mono text-emerald-800 dark:text-emerald-200">
+                      <div className="rounded-lg bg-emerald-500/10 px-2 py-1">
+                        {harvestMode === "afk" ? "Expected Mutations / Harvest" : "Expected Mutations / Stage"}: {selectedMutationModel.expectedMutations.toFixed(2)}
+                      </div>
+                      <div className="rounded-lg bg-emerald-500/10 px-2 py-1">
+                        {harvestMode === "afk" ? "Window Time" : "Stage Time"}: {formatDuration(selectedMutationModel.harvestHours)}
+                      </div>
+                      <div className="rounded-lg bg-emerald-500/10 px-2 py-1">
+                        Revenue: {formatCoins(selectedMutationModel.revenue)}
+                      </div>
+                      <div className="rounded-lg bg-emerald-500/10 px-2 py-1">
+                        Costs: {formatCoins(selectedMutationModel.costs)}
+                      </div>
+                      <div className="rounded-lg bg-emerald-500/10 px-2 py-1">
+                        Net: {formatCoins(selectedMutationModel.net)}
+                      </div>
+                      <div className="rounded-lg bg-emerald-600/20 px-2 py-1 font-bold">
+                        Profit / Hour: {formatCoins(selectedMutationModel.profitHr)}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {selectedMutation.breakdown.yields && selectedMutation.breakdown.yields.length > 0 ? (
                   <div className="space-y-3">
