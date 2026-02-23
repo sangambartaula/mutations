@@ -243,9 +243,10 @@ def get_leaderboard(
             if progress_pct > 0:
                 smart_progress[req_crop] = progress_pct
 
-        # 3. Simple Math
+        # 3. Simple Math (single base model used by default leaderboard metrics)
         profit_batch = total_cycle_revenue - opt_cost
-        profit_per_cycle = (profit_batch / estimated_time) if estimated_time > 0 else 0.0
+        profit_per_cycle = (profit_batch / growth_stages) if growth_stages > 0 else 0.0
+        profit_per_hour = (profit_batch / estimated_time) if estimated_time > 0 else 0.0
 
         # Deterministic expected-value model for mutation-spawn profitability over time.
         if harvest_mode == "custom_time":
@@ -263,7 +264,7 @@ def get_leaderboard(
         expected_total_mutations = plots * expected_mutations_per_plot
         expected_mutation_revenue = expected_total_mutations * mut_sell_price_value
         expected_profit = expected_mutation_revenue - opt_cost
-        profit_per_hour = (expected_profit / harvest_time_hours) if harvest_time_hours > 0 else 0.0
+        expected_profit_per_hour = (expected_profit / harvest_time_hours) if harvest_time_hours > 0 else 0.0
         
         # 4. Scoring Logic
         score = 0
@@ -280,7 +281,7 @@ def get_leaderboard(
             if score <= 0:
                 continue
         elif mode == "hourly":
-            score = profit_per_hour
+            score = expected_profit_per_hour
             
         breakdown = {
             "base_limit": base_limit,
@@ -312,7 +313,8 @@ def get_leaderboard(
                 "completed_cycles": completed_cycles,
                 "expected_mutations": expected_total_mutations,
                 "expected_revenue": expected_mutation_revenue,
-                "expected_profit": expected_profit
+                "expected_profit": expected_profit,
+                "expected_profit_per_hour": expected_profit_per_hour
             },
             "breakdown": breakdown
         })

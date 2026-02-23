@@ -61,10 +61,13 @@ class LeaderboardTests(unittest.TestCase):
 
         for mutation in result["leaderboard"]:
             estimated_time = mutation["breakdown"]["estimated_time_hours"]
-            if estimated_time <= 0:
+            growth_stages = mutation["breakdown"]["growth_stages"]
+            if estimated_time <= 0 or growth_stages <= 0:
                 continue
-            expected = mutation["profit"] / estimated_time
-            self.assertAlmostEqual(mutation["profit_per_cycle"], expected, places=6)
+            expected_cycle = mutation["profit"] / growth_stages
+            expected_hour = mutation["profit"] / estimated_time
+            self.assertAlmostEqual(mutation["profit_per_cycle"], expected_cycle, places=6)
+            self.assertAlmostEqual(mutation["profit_per_hour"], expected_hour, places=6)
 
     @patch("api.index.get_bazaar_prices", return_value={})
     def test_lonelily_override_affects_profit_mode_mutation_count(self, _mock_prices):
@@ -144,7 +147,7 @@ class LeaderboardTests(unittest.TestCase):
         expected_mutations = plots * x * (1.0 - ((1.0 - chance) ** completed_cycles))
         expected_profit_per_hour = (expected_mutations * 100.0) / harvest_time_hours
 
-        self.assertAlmostEqual(lonelily["profit_per_hour"], expected_profit_per_hour, places=6)
+        self.assertAlmostEqual(lonelily["hourly"]["expected_profit_per_hour"], expected_profit_per_hour, places=6)
 
 
 if __name__ == "__main__":
