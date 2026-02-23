@@ -164,6 +164,10 @@ def get_leaderboard(
         growth_stages = max(1, int(m_data.get("growth_stages", DEFAULT_GROWTH_STAGE_BY_MUTATION.get(mut_name, 30))))
         special_mult = float(m_data.get("special_multiplier", DEFAULT_SPECIAL_MULTIPLIER_BY_MUTATION.get(mut_name, 1.0)))
         effective_special_mult = float(m_data.get("effective_special_multiplier", special_mult))
+        spawn_fill_fraction = 1.0
+        if "mutation_chance_override" in m_data:
+            spawn_fill_fraction = 1.0 - ((1.0 - mutation_chance_effective) ** growth_stages)
+        effective_limit = limit * spawn_fill_fraction
             
         estimated_time = growth_stages * cycle_time_hours
         
@@ -174,7 +178,7 @@ def get_leaderboard(
             base_drop = float(raw_val) if raw_val and raw_val.strip() else 0.0
             
             if base_drop > 0:
-                full_drops = base_drop * limit * calc_mult
+                full_drops = base_drop * effective_limit * calc_mult
                 
                 expected_drops = (full_drops * effective_special_mult)
                 bd_display = base_drop
@@ -199,7 +203,7 @@ def get_leaderboard(
                         "total_value": expected_drops * crop_price,
                         "math": {
                             "base": bd_display,
-                            "limit": limit,
+                            "limit": effective_limit,
                             "gh_buff": gh_buff,
                             "unique_buff": unique_buff,
                             "wart_buff": wart_buff,
@@ -208,7 +212,7 @@ def get_leaderboard(
                         }
                     })
                 
-        expected_mut_drops = limit
+        expected_mut_drops = effective_limit
         expected_mut_val = expected_mut_drops * mut_sell_price_value
         total_cycle_revenue = expected_drops_value + expected_mut_val
         
@@ -220,7 +224,7 @@ def get_leaderboard(
                 "total_value": expected_mut_val,
                 "math": {
                     "base": 1.0,
-                    "limit": limit,
+                    "limit": effective_limit,
                     "gh_buff": 0.0,
                     "unique_buff": 0.0,
                     "wart_buff": 1.0,
@@ -267,9 +271,9 @@ def get_leaderboard(
             score = profit_batch
         elif mode == "target" and target_crop:
             if target_crop == "Mushroom":
-                score = (float(cleaned_row.get("Red Mushroom ", 0)) + float(cleaned_row.get("Brown Mushroom", 0))) * limit * calc_mult * effective_special_mult
+                score = (float(cleaned_row.get("Red Mushroom ", 0)) + float(cleaned_row.get("Brown Mushroom", 0))) * effective_limit * calc_mult * effective_special_mult
             else:
-                score = float(cleaned_row.get(target_crop, 0)) * limit * calc_mult * effective_special_mult
+                score = float(cleaned_row.get(target_crop, 0)) * effective_limit * calc_mult * effective_special_mult
             
         elif mode == "smart":
             score = sum(smart_progress.values())

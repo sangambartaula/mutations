@@ -67,6 +67,30 @@ class LeaderboardTests(unittest.TestCase):
             self.assertAlmostEqual(mutation["profit_per_cycle"], expected, places=6)
 
     @patch("api.index.get_bazaar_prices", return_value={})
+    def test_lonelily_override_affects_profit_mode_mutation_count(self, _mock_prices):
+        result = get_leaderboard(
+            plots=3,
+            fortune=2500,
+            gh_upgrade=9,
+            unique_crops=12,
+            mode="profit",
+            setup_mode="buy_order",
+            sell_mode="sell_offer",
+            target_crop=None,
+            maxed_crops="",
+            mutation_chance=0.25,
+            harvest_mode="full",
+            custom_time_hours=24.0,
+        )
+
+        lonelily = next((m for m in result["leaderboard"] if m["mutationName"] == "Lonelily"), None)
+        self.assertIsNotNone(lonelily)
+        lonelily_yield = next((y for y in lonelily["breakdown"]["yields"] if y["name"] == "Lonelily"), None)
+        self.assertIsNotNone(lonelily_yield)
+        # 25 per plot * 3 plots * 0.02 chance over 1 cycle
+        self.assertAlmostEqual(lonelily_yield["amount"], 1.5, places=6)
+
+    @patch("api.index.get_bazaar_prices", return_value={})
     def test_all_in_aloe_uses_reset_adjusted_special_multiplier_at_stage_14(self, _mock_prices):
         result = get_leaderboard(
             plots=3,
