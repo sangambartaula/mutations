@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Skyblock Mutations">
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="#10b981"/>
+  <path d="M32 45V30" stroke="#ffffff" stroke-width="4" stroke-linecap="round"/>
+  <path d="M32 33c-7 0-12-5-12-12 7 0 12 5 12 12Z" fill="#ffffff"/>
+  <path d="M32 29c7 0 12-5 12-12-7 0-12 5-12 12Z" fill="#d1fae5"/>
+</svg>
