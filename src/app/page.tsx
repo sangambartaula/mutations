@@ -143,6 +143,24 @@ export default function Home() {
     return `${hrs}h ${mins}m`;
   };
 
+  const formatYieldCalculation = (math: YieldMath, unitPrice: number) => {
+    const factors = [
+      `${math.base} base`,
+      `${math.limit} limit`,
+      `(+${math.gh_buff.toFixed(2)} GH)`,
+      `(+${math.unique_buff.toFixed(2)} Unique)`,
+      `${math.wart_buff} wart buff`,
+      `${math.fortune.toFixed(2)} fortune`,
+    ];
+
+    if (math.special !== 1) {
+      factors.push(`${math.special} special buff`);
+    }
+
+    factors.push(`${formatCoins(unitPrice)} price`);
+    return factors.join(" × ");
+  };
+
 
 
   return (
@@ -531,7 +549,7 @@ export default function Home() {
                         </div>
                         {yld.math && (
                           <div className="text-[10px] text-neutral-400 font-mono bg-neutral-100 dark:bg-neutral-800 px-2 py-1 rounded w-fit border border-neutral-200 dark:border-neutral-700/50">
-                            Calculation: {yld.math.base} base × {yld.math.limit} limit × (+{yld.math.gh_buff.toFixed(2)} GH) × (+{yld.math.unique_buff.toFixed(2)} Unique) × {yld.math.wart_buff} wart buff × {yld.math.fortune.toFixed(2)} fortune × {yld.math.special} special buff × {formatCoins(yld.unit_price)} price
+                            Calculation: {formatYieldCalculation(yld.math, yld.unit_price)}
                           </div>
                         )}
                       </div>
