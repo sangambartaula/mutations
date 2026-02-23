@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { ModeToggle } from "@/components/mode-toggle";
@@ -63,9 +63,9 @@ type LeaderboardResponse = {
 };
 
 const optimizationModes: { id: OptimizationMode; label: string; icon: string }[] = [
-  { id: "profit", label: "Pure Profit", icon: "💰" },
-  { id: "smart", label: "Smart (Milestones)", icon: "🧠" },
-  { id: "target", label: "Focus One Crop", icon: "🎯" },
+  { id: "profit", label: "Pure Profit", icon: "ðŸ’°" },
+  { id: "smart", label: "Smart (Milestones)", icon: "ðŸ§ " },
+  { id: "target", label: "Focus One Crop", icon: "ðŸŽ¯" },
 ];
 
 export default function Home() {
@@ -158,7 +158,7 @@ export default function Home() {
     }
 
     factors.push(`${formatCoins(unitPrice)} price`);
-    return factors.join(" × ");
+    return factors.join(" Ã— ");
   };
 
 
@@ -342,6 +342,7 @@ export default function Home() {
         <main className="flex-1 min-w-0 space-y-8">
 
           {/* CROP MILESTONES SECTION */}
+          {mode === "smart" && (
           <div className="bg-white dark:bg-neutral-900 rounded-2xl p-6 shadow-sm border border-neutral-200 dark:border-neutral-800">
             <h2 className="text-lg font-semibold flex items-center gap-2 mb-4">
               <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg">
@@ -350,7 +351,7 @@ export default function Home() {
               Crop Milestones
             </h2>
             <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-6">
-              Toggle: <span className="text-emerald-600 font-bold">Maxed</span> vs <span className="text-blue-500 font-bold">Needed</span>.
+              Mark crops as maxed to exclude them from Smart mode priority.
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
               {displayCrops.map(crop => (
@@ -363,11 +364,21 @@ export default function Home() {
                     }`}
                 >
                   <span className="truncate">{crop}</span>
-                  <span className="shrink-0">{maxedCrops.includes(crop) ? '✅' : '⚡'}</span>
+                  <span
+                    className={`shrink-0 inline-flex items-center justify-center w-4 h-4 rounded-sm border text-[10px] leading-none ${
+                      maxedCrops.includes(crop)
+                        ? "bg-emerald-500 border-emerald-500 text-white"
+                        : "border-blue-500/60 bg-transparent text-transparent"
+                    }`}
+                    aria-hidden="true"
+                  >
+                    ✓
+                  </span>
                 </button>
               ))}
             </div>
           </div>
+          )}
 
           <div className="bg-white dark:bg-neutral-900 rounded-2xl shadow-sm border border-neutral-200 dark:border-neutral-800 overflow-hidden">
             <div className="px-6 py-5 border-b border-neutral-200 dark:border-neutral-800 flex justify-between items-center bg-neutral-50/50 dark:bg-neutral-900/50">
@@ -420,7 +431,7 @@ export default function Home() {
                         </td>
                         <td className="px-6 py-4 font-medium flex items-center gap-3">
                           <div className="w-8 h-8 shrink-0 flex items-center justify-center bg-neutral-100 dark:bg-neutral-800 rounded-md border border-neutral-200 dark:border-neutral-700 text-lg">
-                            🌱
+                            ðŸŒ±
                           </div>
                           <div>
                             <span className="hover:text-amber-500 transition-colors">{item.mutationName}</span>
@@ -463,7 +474,7 @@ export default function Home() {
             <div className="p-6 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between bg-neutral-50/50 dark:bg-neutral-900/50">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 shrink-0 flex items-center justify-center bg-emerald-100 dark:bg-emerald-900/30 rounded-xl border border-emerald-200 dark:border-emerald-800 text-2xl shadow-sm">
-                  🌱
+                  ðŸŒ±
                 </div>
                 <div>
                   <h3 className="text-xl font-bold">{selectedMutation.mutationName} Breakdown</h3>
@@ -489,7 +500,7 @@ export default function Home() {
                         <span className="font-medium">{ing.amount}x <span className="text-emerald-700 dark:text-emerald-300">{ing.name}</span></span>
                       </div>
                       <div className="text-right">
-                        <div className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">{formatCoins(ing.total_cost)} 🪙</div>
+                        <div className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">{formatCoins(ing.total_cost)} ðŸª™</div>
                         <div className="text-[10px] text-neutral-400 font-mono mt-0.5">{formatCoins(ing.unit_price)} each</div>
                       </div>
                     </div>
@@ -499,7 +510,7 @@ export default function Home() {
 
               <div className="flex justify-between items-center pt-4 border-t border-neutral-200 dark:border-neutral-800">
                 <span className="font-medium">Total Setup Cost</span>
-                <span className="font-mono text-lg font-bold text-amber-500">{formatCoins(selectedMutation.breakdown.total_setup_cost)} 🪙</span>
+                <span className="font-mono text-lg font-bold text-amber-500">{formatCoins(selectedMutation.breakdown.total_setup_cost)} ðŸª™</span>
               </div>
 
               <div className="pt-6">
@@ -543,7 +554,7 @@ export default function Home() {
                             <span className="font-medium">{formatCoins(yld.amount)}x <span className="text-emerald-700 dark:text-emerald-300">{yld.name}</span></span>
                           </div>
                           <div className="text-right">
-                            <div className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">{formatCoins(yld.total_value)} 🪙</div>
+                            <div className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">{formatCoins(yld.total_value)} ðŸª™</div>
                             <div className="text-[10px] text-neutral-400 font-mono mt-0.5">{formatCoins(yld.unit_price)} each</div>
                           </div>
                         </div>
@@ -561,13 +572,13 @@ export default function Home() {
 
                 <div className="flex justify-between items-center p-6 bg-emerald-500/10 rounded-2xl border border-emerald-500/20">
                   <span className="font-bold text-emerald-700 dark:text-emerald-400">Total Batch Revenue</span>
-                  <span className="text-2xl font-mono font-black text-emerald-600 dark:text-emerald-400">+{formatCoins(selectedMutation.breakdown.total_revenue)} 🪙</span>
+                  <span className="text-2xl font-mono font-black text-emerald-600 dark:text-emerald-400">+{formatCoins(selectedMutation.breakdown.total_revenue)} ðŸª™</span>
                 </div>
 
                 <div className="flex justify-between items-center p-6 bg-emerald-500 rounded-2xl shadow-xl shadow-emerald-500/20 text-white">
                   <span className="font-black uppercase tracking-wider text-sm">Expected Net Profit</span>
                   <span className="text-2xl font-mono font-black">
-                    {formatCoins(selectedMutation.breakdown.total_revenue - selectedMutation.breakdown.total_setup_cost)} 🪙
+                    {formatCoins(selectedMutation.breakdown.total_revenue - selectedMutation.breakdown.total_setup_cost)} ðŸª™
                   </span>
                 </div>
               </div>
@@ -594,3 +605,4 @@ export default function Home() {
     </div>
   );
 }
+
