@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Coins, Sprout, Clock, Calculator, Loader2, ArrowUpRight, AlertTriangle, X } from "lucide-react";
 
@@ -67,11 +67,18 @@ type LeaderboardResponse = {
   };
 };
 
-const optimizationModes: { id: OptimizationMode; label: string; icon: string }[] = [
-  { id: "profit", label: "Pure Profit", icon: "ðŸ’°" },
-  { id: "smart", label: "Smart (Milestones)", icon: "ðŸ§ " },
-  { id: "target", label: "Focus One Crop", icon: "ðŸŽ¯" },
+const optimizationModes: { id: OptimizationMode; label: string }[] = [
+  { id: "profit", label: "Pure Profit" },
+  { id: "smart", label: "Smart (Milestones)" },
+  { id: "target", label: "Focus One Crop" },
 ];
+
+const cropLabelMap: Record<string, string> = {
+  "Coco Bean": "Cocoa Beans",
+  "Sugar cane": "Sugar Cane",
+};
+
+const toCropLabel = (crop: string) => cropLabelMap[crop] ?? crop;
 
 export default function Home() {
   const [plots, setPlots] = useState(3);
@@ -94,9 +101,21 @@ export default function Home() {
   const [selectedMutation, setSelectedMutation] = useState<LeaderboardItem | null>(null);
 
   const displayCrops = [
-    "Wheat", "Carrot", "Potato", "Pumpkin", "Sugar cane", "Melon", "Cactus",
-    "Coco Bean", "Nether Wart", "Sunflower", "Moonflower", "Wild Rose", "Mushroom"
+    { key: "Wheat", label: "Wheat" },
+    { key: "Carrot", label: "Carrot" },
+    { key: "Potato", label: "Potato" },
+    { key: "Pumpkin", label: "Pumpkin" },
+    { key: "Sugar cane", label: "Sugar Cane" },
+    { key: "Melon", label: "Melon" },
+    { key: "Cactus", label: "Cactus" },
+    { key: "Coco Bean", label: "Cocoa Beans" },
+    { key: "Nether Wart", label: "Nether Wart" },
+    { key: "Sunflower", label: "Sunflower" },
+    { key: "Moonflower", label: "Moonflower" },
+    { key: "Wild Rose", label: "Wild Rose" },
+    { key: "Mushroom", label: "Mushroom" },
   ];
+  const tableScrollRef = useRef<HTMLDivElement | null>(null);
 
   const [data, setData] = useState<LeaderboardResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -242,6 +261,11 @@ export default function Home() {
     return sortDirection === "asc" ? "↑" : "↓";
   };
 
+  const scrollLeaderboardBy = (pixels: number) => {
+    if (!tableScrollRef.current) return;
+    tableScrollRef.current.scrollBy({ left: pixels, behavior: "smooth" });
+  };
+
 
 
   return (
@@ -261,7 +285,7 @@ export default function Home() {
       </nav>
 
       {/* DASHBOARD LAYOUT */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col md:flex-row gap-8">
+      <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col md:flex-row gap-8">
 
         {/* SIDEBAR: SETTINGS */}
         <aside className="w-full md:w-80 shrink-0 space-y-6">
@@ -284,7 +308,6 @@ export default function Home() {
                       : 'border-neutral-200 dark:border-neutral-800 hover:border-emerald-500/50 hover:bg-emerald-50 dark:hover:bg-emerald-900/10'
                       }`}
                   >
-                    <span>{m.icon}</span>
                     {m.label}
                   </button>
                 ))}
@@ -301,7 +324,7 @@ export default function Home() {
                   className="w-full bg-neutral-100 dark:bg-neutral-800 border-transparent rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                 >
                   {displayCrops.map(c => (
-                    <option key={c} value={c}>{c}</option>
+                    <option key={c.key} value={c.key}>{c.label}</option>
                   ))}
                 </select>
               </div>
@@ -456,7 +479,7 @@ export default function Home() {
                       ? "bg-blue-500 text-white border-blue-500"
                       : "bg-neutral-50 text-neutral-600 border-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:border-neutral-700"}`}
                   >
-                    {crop}
+                    {toCropLabel(crop)}
                   </button>
                 ))}
               </div>
@@ -464,18 +487,18 @@ export default function Home() {
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                 {displayCrops.map(crop => (
                   <button
-                    key={crop}
-                    onClick={() => toggleMaxedCrop(crop)}
-                    className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${maxedCrops.includes(crop)
+                    key={crop.key}
+                    onClick={() => toggleMaxedCrop(crop.key)}
+                    className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${maxedCrops.includes(crop.key)
                       ? 'bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-400'
                       : 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400'
                       }`}
-                    aria-label={`${crop} milestone ${maxedCrops.includes(crop) ? "maxed" : "needed"}`}
+                    aria-label={`${crop.label} milestone ${maxedCrops.includes(crop.key) ? "maxed" : "needed"}`}
                   >
-                    <span className="truncate">{crop}</span>
+                    <span className="truncate">{crop.label}</span>
                     <span
                       className={`shrink-0 inline-flex items-center justify-center w-4 h-4 rounded-sm border text-[10px] leading-none ${
-                        maxedCrops.includes(crop)
+                        maxedCrops.includes(crop.key)
                           ? "bg-emerald-500 border-emerald-500 text-white"
                           : "border-blue-500/60 bg-transparent text-transparent"
                       }`}
@@ -495,10 +518,18 @@ export default function Home() {
                 <Coins className="w-5 h-5 text-amber-500" />
                 {mode === "profit" ? "Profit Leaderboard" : mode === "smart" ? "Smart Milestone Progress" : `${targetCrop} Optimization`}
               </h2>
-              {loading && <Loader2 className="w-5 h-5 animate-spin text-emerald-500" />}
+              <div className="flex items-center gap-2">
+                {mode === "smart" && visibleSmartCrops.length > 6 && (
+                  <>
+                    <button type="button" onClick={() => scrollLeaderboardBy(-420)} className="px-2 py-1 text-xs rounded border border-neutral-300 dark:border-neutral-700">←</button>
+                    <button type="button" onClick={() => scrollLeaderboardBy(420)} className="px-2 py-1 text-xs rounded border border-neutral-300 dark:border-neutral-700">→</button>
+                  </>
+                )}
+                {loading && <Loader2 className="w-5 h-5 animate-spin text-emerald-500" />}
+              </div>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto" ref={tableScrollRef}>
               {error ? (
                 <div className="p-8 text-center text-red-500 bg-red-50 dark:bg-red-950/20 m-4 rounded-xl">
                   {error}
@@ -530,7 +561,7 @@ export default function Home() {
                       {mode === "smart" ? (
                         visibleSmartCrops.map((crop) => (
                           <th key={crop} className="px-6 py-4 font-semibold text-right text-blue-600 dark:text-blue-400">
-                            {crop}
+                            {toCropLabel(crop)}
                           </th>
                         ))
                       ) : (
@@ -576,7 +607,7 @@ export default function Home() {
                         </td>
                         <td className="px-6 py-4 font-medium flex items-center gap-3">
                           <div className="w-8 h-8 shrink-0 flex items-center justify-center bg-neutral-100 dark:bg-neutral-800 rounded-md border border-neutral-200 dark:border-neutral-700 text-lg">
-                            ðŸŒ±
+                            <Sprout className="w-4 h-4 text-emerald-500" />
                           </div>
                           <div>
                             <span className="hover:text-amber-500 transition-colors">{item.mutationName}</span>
@@ -631,7 +662,7 @@ export default function Home() {
             <div className="p-6 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between bg-neutral-50/50 dark:bg-neutral-900/50">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 shrink-0 flex items-center justify-center bg-emerald-100 dark:bg-emerald-900/30 rounded-xl border border-emerald-200 dark:border-emerald-800 text-2xl shadow-sm">
-                  ðŸŒ±
+                  <Sprout className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
                 </div>
                 <div>
                   <h3 className="text-xl font-bold">{selectedMutation.mutationName} Breakdown</h3>
@@ -654,10 +685,10 @@ export default function Home() {
                   {selectedMutation.breakdown.ingredients.map((ing) => (
                     <div key={ing.name} className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-100 dark:border-neutral-800">
                       <div className="flex items-center gap-3">
-                        <span className="font-medium">{ing.amount}x <span className="text-emerald-700 dark:text-emerald-300">{ing.name}</span></span>
+                        <span className="font-medium">{ing.amount}x <span className="text-emerald-700 dark:text-emerald-300">{toCropLabel(ing.name)}</span></span>
                       </div>
                       <div className="text-right">
-                        <div className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">{formatCoins(ing.total_cost)} ðŸª™</div>
+                        <div className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">{formatCoins(ing.total_cost)} coins</div>
                         <div className="text-[10px] text-neutral-400 font-mono mt-0.5">{formatCoins(ing.unit_price)} each</div>
                       </div>
                     </div>
@@ -667,7 +698,7 @@ export default function Home() {
 
               <div className="flex justify-between items-center pt-4 border-t border-neutral-200 dark:border-neutral-800">
                 <span className="font-medium">Total Setup Cost</span>
-                <span className="font-mono text-lg font-bold text-amber-500">{formatCoins(selectedMutation.breakdown.total_setup_cost)} ðŸª™</span>
+                <span className="font-mono text-lg font-bold text-amber-500">{formatCoins(selectedMutation.breakdown.total_setup_cost)} coins</span>
               </div>
 
               <div className="pt-6">
@@ -708,10 +739,10 @@ export default function Home() {
                       <div key={yld.name} className="flex flex-col p-3 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-100 dark:border-neutral-800">
                         <div className="flex items-center justify-between mb-1">
                           <div className="flex items-center gap-3">
-                            <span className="font-medium">{formatCoins(yld.amount)}x <span className="text-emerald-700 dark:text-emerald-300">{yld.name}</span></span>
+                            <span className="font-medium">{formatCoins(yld.amount)}x <span className="text-emerald-700 dark:text-emerald-300">{toCropLabel(yld.name)}</span></span>
                           </div>
                           <div className="text-right">
-                            <div className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">{formatCoins(yld.total_value)} ðŸª™</div>
+                            <div className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">{formatCoins(yld.total_value)} coins</div>
                             <div className="text-[10px] text-neutral-400 font-mono mt-0.5">{formatCoins(yld.unit_price)} each</div>
                           </div>
                         </div>
@@ -729,13 +760,13 @@ export default function Home() {
 
                 <div className="flex justify-between items-center p-6 bg-emerald-500/10 rounded-2xl border border-emerald-500/20">
                   <span className="font-bold text-emerald-700 dark:text-emerald-400">Total Batch Revenue</span>
-                  <span className="text-2xl font-mono font-black text-emerald-600 dark:text-emerald-400">+{formatCoins(selectedMutation.breakdown.total_revenue)} ðŸª™</span>
+                  <span className="text-2xl font-mono font-black text-emerald-600 dark:text-emerald-400">+{formatCoins(selectedMutation.breakdown.total_revenue)} coins</span>
                 </div>
 
                 <div className="flex justify-between items-center p-6 bg-emerald-500 rounded-2xl shadow-xl shadow-emerald-500/20 text-white">
                   <span className="font-black uppercase tracking-wider text-sm">Expected Net Profit</span>
                   <span className="text-2xl font-mono font-black">
-                    {formatCoins(selectedMutation.breakdown.total_revenue - selectedMutation.breakdown.total_setup_cost)} ðŸª™
+                    {formatCoins(selectedMutation.breakdown.total_revenue - selectedMutation.breakdown.total_setup_cost)} coins
                   </span>
                 </div>
               </div>
