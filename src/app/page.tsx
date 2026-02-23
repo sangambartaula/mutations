@@ -4,29 +4,93 @@ import { useState, useEffect } from "react";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Coins, Sprout, Clock, Calculator, Loader2, ArrowUpRight, AlertTriangle, X } from "lucide-react";
 
+type OptimizationMode = "profit" | "smart" | "target";
+type SetupMode = "buy_order" | "insta_buy";
+type SellMode = "sell_offer" | "insta_sell";
+
+type YieldMath = {
+  base: number;
+  limit: number;
+  gh_buff: number;
+  unique_buff: number;
+  wart_buff: number;
+  fortune: number;
+  special: number;
+};
+
+type Ingredient = {
+  name: string;
+  amount: number;
+  unit_price: number;
+  total_cost: number;
+};
+
+type YieldItem = {
+  name: string;
+  amount: number;
+  unit_price: number;
+  total_value: number;
+  math?: YieldMath;
+};
+
+type MutationBreakdown = {
+  base_limit: number;
+  ingredients: Ingredient[];
+  yields: YieldItem[];
+  total_setup_cost: number;
+  total_revenue: number;
+  growth_stages: number;
+  estimated_time_hours: number;
+};
+
+type LeaderboardItem = {
+  mutationName: string;
+  score: number;
+  profit: number;
+  opt_cost: number;
+  revenue: number;
+  warning: boolean;
+  mut_price: number;
+  limit: number;
+  breakdown: MutationBreakdown;
+};
+
+type LeaderboardResponse = {
+  leaderboard: LeaderboardItem[];
+  metadata: {
+    cycle_time_hours: number;
+  };
+};
+
+const optimizationModes: { id: OptimizationMode; label: string; icon: string }[] = [
+  { id: "profit", label: "Pure Profit", icon: "💰" },
+  { id: "smart", label: "Smart (Milestones)", icon: "🧠" },
+  { id: "target", label: "Focus One Crop", icon: "🎯" },
+];
+
 export default function Home() {
-  const [plots, setPlots] = useState(1);
+  const [plots, setPlots] = useState(3);
   const [fortune, setFortune] = useState(2500);
   const [ghUpgrade, setGhUpgrade] = useState(9);
   const [uniqueCrops, setUniqueCrops] = useState(12);
 
-  const [mode, setMode] = useState("profit");
+  const [mode, setMode] = useState<OptimizationMode>("profit");
   const [targetCrop, setTargetCrop] = useState("Wheat");
   const [maxedCrops, setMaxedCrops] = useState<string[]>([]);
 
   // New Toggles
-  const [setupMode, setSetupMode] = useState("insta_buy");
-  const [sellMode, setSellMode] = useState("sell_offer");
+  const [setupMode, setSetupMode] = useState<SetupMode>("buy_order");
+  const [sellMode, setSellMode] = useState<SellMode>("sell_offer");
 
   // Modal State
-  const [selectedMutation, setSelectedMutation] = useState<any>(null);
+  const [selectedMutation, setSelectedMutation] = useState<LeaderboardItem | null>(null);
 
   const displayCrops = [
     "Wheat", "Carrot", "Potato", "Pumpkin", "Sugar cane", "Melon", "Cactus",
     "Coco Bean", "Nether Wart", "Sunflower", "Moonflower", "Wild Rose", "Mushroom"
   ];
 
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<LeaderboardResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -48,10 +112,10 @@ export default function Home() {
         });
         const res = await fetch(`/api/leaderboard?${query.toString()}`);
         if (!res.ok) throw new Error("Failed to fetch leaderboard data.");
-        const json = await res.json();
+        const json: LeaderboardResponse = await res.json();
         setData(json);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Unexpected error while fetching leaderboard data.");
       } finally {
         setLoading(false);
       }
@@ -102,11 +166,7 @@ export default function Home() {
             <div className="mb-6">
               <label className="text-sm font-medium mb-2 block">Optimization Mode</label>
               <div className="grid grid-cols-1 gap-2">
-                {[
-                  { id: "profit", label: "Pure Profit", icon: "💰" },
-                  { id: "smart", label: "Smart (Milestones)", icon: "🧠" },
-                  { id: "target", label: "Focus One Crop", icon: "🎯" }
-                ].map((m) => (
+                {optimizationModes.map((m) => (
                   <button
                     key={m.id}
                     onClick={() => setMode(m.id)}
@@ -313,7 +373,7 @@ export default function Home() {
                     </tr>
                   </thead>
                   <tbody>
-                    {data.leaderboard.map((item: any, idx: number) => (
+                    {data.leaderboard.map((item, idx) => (
                       <tr
                         key={item.mutationName}
                         onClick={() => setSelectedMutation(item)}
@@ -391,7 +451,7 @@ export default function Home() {
 
               {selectedMutation.breakdown.ingredients.length > 0 && (
                 <div className="space-y-3">
-                  {selectedMutation.breakdown.ingredients.map((ing: any) => (
+                  {selectedMutation.breakdown.ingredients.map((ing) => (
                     <div key={ing.name} className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-100 dark:border-neutral-800">
                       <div className="flex items-center gap-3">
                         <span className="font-medium">{ing.amount}x <span className="text-emerald-700 dark:text-emerald-300">{ing.name}</span></span>
@@ -416,30 +476,35 @@ export default function Home() {
                   <span className="text-sm font-normal text-neutral-500 dark:text-neutral-400">~{data ? Math.floor(data.metadata.cycle_time_hours) : 0}h Cycle</span>
                 </h4>
 
-                <div className="mb-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 rounded-lg p-3 text-sm text-blue-800 dark:text-blue-200 flex flex-col gap-1 shadow-sm">
-
+                <div className="p-5 bg-blue-500/10 rounded-2xl border border-blue-500/20 space-y-4">
                   {(selectedMutation.mutationName === "Magic Jellybean" || selectedMutation.mutationName === "All-in Aloe") && (
-                    <div className="mb-2 pb-2 border-b border-blue-200 dark:border-blue-800/50 text-xs">
-                      <span className="font-bold flex items-center gap-1.5 mb-1"><AlertTriangle className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" /> Lifecycle Note:</span>
-                      {selectedMutation.mutationName === "Magic Jellybean"
-                        ? "Magic Jellybean is exceptionally rare and has 120 growth stages! It will take significantly longer to reach full maturity than standard crops."
-                        : "All-in Aloe has 27 max growth stages. Each stage has a chance to reset to 1. Mathematically, it is optimal to harvest it around stage 13-14 to maximize profit before it resets!"}
+                    <div className="p-3 bg-blue-500/10 rounded-xl border border-blue-500/20 mb-4">
+                      <div className="flex items-start gap-3">
+                        <AlertTriangle className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
+                        <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed font-medium">
+                          {selectedMutation.mutationName === "Magic Jellybean"
+                            ? "Magic Jellybean is exceptionally rare and has 120 growth stages! It will take significantly longer to reach full maturity than standard crops."
+                            : "For All-in Aloe, the optimal harvest stage is Stage 14 to avoid the maturity reset mechanic."}
+                        </p>
+                      </div>
                     </div>
                   )}
-
-                  <div className="flex justify-between w-full mt-1">
-                    <span className="font-bold flex items-center gap-1.5"><Clock className="w-4 h-4" /> Target Growth Stage:</span>
-                    <span className="font-mono font-bold bg-blue-100 dark:bg-blue-800/60 px-2 py-0.5 rounded shadow-sm">{selectedMutation.breakdown.growth_stages} Stages</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm font-bold text-blue-700 dark:text-blue-400">
+                      <Clock className="w-4 h-4" />
+                      Target Growth Stage:
+                    </div>
+                    <span className="bg-blue-600 text-white px-3 py-1 rounded-lg text-xs font-black">{selectedMutation.breakdown.growth_stages} Stages</span>
                   </div>
-                  <div className="flex justify-between w-full mt-1 border-t border-blue-200 dark:border-blue-800/50 pt-1.5">
-                    <span className="text-xs text-blue-600 dark:text-blue-400">Estimated Lifecycle Time:</span>
-                    <span className="font-mono text-xs font-bold">{selectedMutation.breakdown.estimated_time_hours} Hours</span>
+                  <div className="flex items-center justify-between pt-2 border-t border-blue-500/20">
+                    <span className="text-xs font-medium text-blue-600 dark:text-blue-400">Estimated Lifecycle Time:</span>
+                    <span className="text-sm font-black text-blue-700 dark:text-blue-300">{Math.round(selectedMutation.breakdown.estimated_time_hours)} Hours</span>
                   </div>
                 </div>
 
                 {selectedMutation.breakdown.yields && selectedMutation.breakdown.yields.length > 0 ? (
                   <div className="space-y-3">
-                    {selectedMutation.breakdown.yields.map((yld: any) => (
+                    {selectedMutation.breakdown.yields.map((yld) => (
                       <div key={yld.name} className="flex flex-col p-3 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-100 dark:border-neutral-800">
                         <div className="flex items-center justify-between mb-1">
                           <div className="flex items-center gap-3">
@@ -452,7 +517,7 @@ export default function Home() {
                         </div>
                         {yld.math && (
                           <div className="text-[10px] text-neutral-400 font-mono bg-neutral-100 dark:bg-neutral-800 px-2 py-1 rounded w-fit border border-neutral-200 dark:border-neutral-700/50">
-                            Calculation: {yld.math.base} base × {yld.math.limit} limit × {yld.math.additive_yield.toFixed(2)} additive base × {yld.math.wart_buff} wart buff × {yld.math.fortune.toFixed(2)} fortune × {yld.math.special} special buff × {formatCoins(yld.unit_price)} price
+                            Calculation: {yld.math.base} base × {yld.math.limit} limit × (+{yld.math.gh_buff.toFixed(2)} GH) × (+{yld.math.unique_buff.toFixed(2)} Unique) × {yld.math.wart_buff} wart buff × {yld.math.fortune.toFixed(2)} fortune × {yld.math.special} special buff × {formatCoins(yld.unit_price)} price
                           </div>
                         )}
                       </div>
@@ -462,14 +527,14 @@ export default function Home() {
                   <p className="text-sm text-neutral-500 italic">No direct harvest yields.</p>
                 )}
 
-                <div className="flex justify-between items-center pt-4 mt-4 border-t border-neutral-200 dark:border-neutral-800">
-                  <span className="font-medium">Total Revenue</span>
-                  <span className="font-mono text-lg font-bold text-emerald-500">+{formatCoins(selectedMutation.breakdown.total_revenue)} 🪙</span>
+                <div className="flex justify-between items-center p-6 bg-emerald-500/10 rounded-2xl border border-emerald-500/20">
+                  <span className="font-bold text-emerald-700 dark:text-emerald-400">Total Batch Revenue</span>
+                  <span className="text-2xl font-mono font-black text-emerald-600 dark:text-emerald-400">+{formatCoins(selectedMutation.breakdown.total_revenue)} 🪙</span>
                 </div>
 
-                <div className="flex justify-between items-center pt-3 mt-3 border-t-2 border-dashed border-neutral-200 dark:border-neutral-800">
-                  <span className="font-bold text-lg">Expected Profit</span>
-                  <span className="font-mono text-xl font-black text-emerald-600 dark:text-emerald-400">
+                <div className="flex justify-between items-center p-6 bg-emerald-500 rounded-2xl shadow-xl shadow-emerald-500/20 text-white">
+                  <span className="font-black uppercase tracking-wider text-sm">Expected Net Profit</span>
+                  <span className="text-2xl font-mono font-black">
                     {formatCoins(selectedMutation.breakdown.total_revenue - selectedMutation.breakdown.total_setup_cost)} 🪙
                   </span>
                 </div>
@@ -479,6 +544,21 @@ export default function Home() {
         </div>
       )}
 
+      <style jsx global>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(16, 185, 129, 0.2);
+          border-radius: 20px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(16, 185, 129, 0.4);
+        }
+      `}</style>
     </div>
   );
 }

@@ -152,15 +152,9 @@ def get_leaderboard(
             if base_drop > 0:
                 full_drops = base_drop * limit * calc_mult
                 
-                # Apply special mechanics
-                if mut_name == 'Devourer':
-                    expected_drops = 1 * limit
-                    bd_display = 1.0
-                    sm_display = 1.0
-                else:
-                    expected_drops = (full_drops * special_mult)
-                    bd_display = base_drop
-                    sm_display = special_mult
+                expected_drops = (full_drops * special_mult)
+                bd_display = base_drop
+                sm_display = special_mult
                     
                 crop_price = get_item_price(crop_col, False, sell_mode)
                 if crop_col == "Red Mushroom " or crop_col == "Brown Mushroom": crop_price = 10
@@ -182,7 +176,8 @@ def get_leaderboard(
                         "math": {
                             "base": bd_display,
                             "limit": limit,
-                            "additive_yield": additive_base,
+                            "gh_buff": gh_buff,
+                            "unique_buff": unique_buff,
                             "wart_buff": wart_buff,
                             "fortune": fortune_mult,
                             "special": sm_display
@@ -202,7 +197,8 @@ def get_leaderboard(
                 "math": {
                     "base": 1.0,
                     "limit": limit,
-                    "additive_yield": 1.0,
+                    "gh_buff": 0.0,
+                    "unique_buff": 0.0,
                     "wart_buff": 1.0,
                     "fortune": 1.0,
                     "special": 1.0
