@@ -7,6 +7,8 @@ import { Coins, Sprout, Clock, Calculator, Loader2, ArrowUpRight, AlertTriangle,
 type OptimizationMode = "profit" | "smart" | "target";
 type SetupMode = "buy_order" | "insta_buy";
 type SellMode = "sell_offer" | "insta_sell";
+type SortKey = "rank" | "mutation" | "value" | "cycles" | "setup";
+type SortDirection = "asc" | "desc";
 
 type YieldMath = {
   base: number;
@@ -80,6 +82,8 @@ export default function Home() {
   const [targetCrop, setTargetCrop] = useState("Wheat");
   const [maxedCrops, setMaxedCrops] = useState<string[]>([]);
   const [smartTab, setSmartTab] = useState("all");
+  const [sortKey, setSortKey] = useState<SortKey>("rank");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
   // New Toggles
   const [setupMode, setSetupMode] = useState<SetupMode>("buy_order");
@@ -195,6 +199,46 @@ export default function Home() {
       return (progress[activeSmartTab] ?? 0) > 0;
     })
     : (data?.leaderboard ?? []);
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDirection((prev) => (prev === "desc" ? "asc" : "desc"));
+      return;
+    }
+    setSortKey(key);
+    setSortDirection(key === "mutation" ? "asc" : "desc");
+  };
+
+  const sortValue = (item: LeaderboardItem, key: SortKey) => {
+    if (key === "mutation") return item.mutationName.toLowerCase();
+    if (key === "cycles") return item.breakdown.growth_stages;
+    if (key === "setup") return item.opt_cost;
+    if (key === "value") {
+      if (mode === "smart") {
+        if (activeSmartTab !== "all") return item.smart_progress?.[activeSmartTab] ?? 0;
+        return item.score;
+      }
+      return mode === "target" ? item.score : item.profit;
+    }
+    if (mode === "smart" && activeSmartTab !== "all") {
+      return item.smart_progress?.[activeSmartTab] ?? 0;
+    }
+    return item.score;
+  };
+
+  const sortedLeaderboard = [...visibleLeaderboard].sort((a, b) => {
+    const av = sortValue(a, sortKey);
+    const bv = sortValue(b, sortKey);
+    let cmp = 0;
+    if (typeof av === "string" && typeof bv === "string") cmp = av.localeCompare(bv);
+    else cmp = Number(av) - Number(bv);
+    return sortDirection === "asc" ? cmp : -cmp;
+  });
+
+  const sortIndicator = (key: SortKey) => {
+    if (sortKey !== key) return "↕";
+    return sortDirection === "asc" ? "↑" : "↓";
+  };
 
 
 
@@ -471,8 +515,16 @@ export default function Home() {
                 <table className="w-full text-sm text-left">
                   <thead className="text-xs uppercase bg-neutral-100 dark:bg-neutral-800/50 text-neutral-500 dark:text-neutral-400 border-b border-neutral-200 dark:border-neutral-800">
                     <tr>
-                      <th className="px-6 py-4 font-semibold w-16 text-center">Rank</th>
-                      <th className="px-6 py-4 font-semibold">Mutation Profile</th>
+                      <th className="px-6 py-4 font-semibold w-16 text-center">
+                        <button type="button" onClick={() => toggleSort("rank")} className="inline-flex items-center gap-1">
+                          Rank <span aria-hidden="true">{sortIndicator("rank")}</span>
+                        </button>
+                      </th>
+                      <th className="px-6 py-4 font-semibold">
+                        <button type="button" onClick={() => toggleSort("mutation")} className="inline-flex items-center gap-1">
+                          Mutation <span aria-hidden="true">{sortIndicator("mutation")}</span>
+                        </button>
+                      </th>
                       {mode === "smart" ? (
                         visibleSmartCrops.map((crop) => (
                           <th key={crop} className="px-6 py-4 font-semibold text-right text-blue-600 dark:text-blue-400">
@@ -481,15 +533,25 @@ export default function Home() {
                         ))
                       ) : (
                         <th className="px-6 py-4 font-semibold text-right text-emerald-600 dark:text-emerald-400">
-                          {mode === "profit" ? "Profit / Harvest" : `${targetCrop} Yield`}
+                          <button type="button" onClick={() => toggleSort("value")} className="inline-flex items-center gap-1">
+                            {mode === "profit" ? "Profit / Harvest" : `${targetCrop} Yield`} <span aria-hidden="true">{sortIndicator("value")}</span>
+                          </button>
                         </th>
                       )}
-                      <th className="px-6 py-4 font-semibold text-right hidden md:table-cell">Grow Time</th>
-                      <th className="px-6 py-4 font-semibold text-right hidden sm:table-cell">Setup Cost</th>
+                      <th className="px-6 py-4 font-semibold text-right hidden md:table-cell">
+                        <button type="button" onClick={() => toggleSort("cycles")} className="inline-flex items-center gap-1">
+                          Growth Cycles <span aria-hidden="true">{sortIndicator("cycles")}</span>
+                        </button>
+                      </th>
+                      <th className="px-6 py-4 font-semibold text-right hidden sm:table-cell">
+                        <button type="button" onClick={() => toggleSort("setup")} className="inline-flex items-center gap-1">
+                          Setup Cost <span aria-hidden="true">{sortIndicator("setup")}</span>
+                        </button>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {visibleLeaderboard.map((item, idx) => (
+                    {sortedLeaderboard.map((item, idx) => (
                       <tr
                         key={item.mutationName}
                         onClick={() => setSelectedMutation(item)}
@@ -536,7 +598,7 @@ export default function Home() {
                           </td>
                         )}
                         <td className="px-6 py-4 text-right font-mono text-neutral-500 hidden md:table-cell">
-                          {formatDuration(item.breakdown.estimated_time_hours)}
+                          {item.breakdown.growth_stages} Cycles ({formatDuration(item.breakdown.estimated_time_hours)})
                         </td>
                         <td className="px-6 py-4 text-right font-mono opacity-[0.65] hidden sm:table-cell">
                           {formatCoins(item.opt_cost)}
@@ -620,9 +682,9 @@ export default function Home() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 text-sm font-bold text-blue-700 dark:text-blue-400">
                       <Clock className="w-4 h-4" />
-                      Target Growth Stage:
+                      Growth Cycles:
                     </div>
-                    <span className="bg-blue-600 text-white px-3 py-1 rounded-lg text-xs font-black">{selectedMutation.breakdown.growth_stages} Stages</span>
+                    <span className="bg-blue-600 text-white px-3 py-1 rounded-lg text-xs font-black">{selectedMutation.breakdown.growth_stages} Cycles</span>
                   </div>
                   <div className="flex items-center justify-between pt-2 border-t border-blue-500/20">
                     <span className="text-xs font-medium text-blue-600 dark:text-blue-400">Estimated Lifecycle Time:</span>

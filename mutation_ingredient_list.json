@@ -13,82 +13,94 @@
     "ingredients": {
       "Nether Wart": 26,
       "Fire": 21
-    }
+    },
+    "growth_stages": 1
   },
   "Blastberry": {
     "count": 16,
     "ingredients": {
       "Ashwreath": 34,
       "Chocoberry": 31
-    }
+    },
+    "growth_stages": 6
   },
   "Cheesebite": {
     "count": 16,
     "ingredients": {
       "Fermento": 42,
       "Creambloom": 23
-    }
+    },
+    "growth_stages": 10
   },
   "Chloronite": {
     "count": 16,
     "ingredients": {
       "Coalroot": 55,
       "Thornshade": 12
-    }
+    },
+    "growth_stages": 10
   },
   "Chocoberry": {
     "count": 16,
     "ingredients": {
       "Choconut": 41,
       "Gloomgourd": 24
-    }
+    },
+    "growth_stages": 6
   },
   "Choconut": {
     "count": 72,
     "ingredients": {
       "Cocoa Beans": 28
-    }
+    },
+    "growth_stages": 1
   },
   "Chorus Fruit": {
     "count": 16,
     "ingredients": {
       "Magic Jellybean": 34,
       "Chloronite": 32
-    }
+    },
+    "growth_stages": 12
   },
   "Cindershade": {
     "count": 16,
     "ingredients": {
       "Ashwreath": 42,
       "Witherbloom": 24
-    }
+    },
+    "growth_stages": 8
   },
   "Coalroot": {
     "count": 16,
     "ingredients": {
       "Ashwreath": 49,
       "Scourroot": 18
-    }
+    },
+    "growth_stages": 8
   },
   "Creambloom": {
     "count": 16,
     "ingredients": {
       "Choconut": 65
-    }
+    },
+    "growth_stages": 6
   },
   "Devourer": {
     "count": 16,
     "ingredients": {
       "Zombud": 42,
       "Puffercloud": 23
-    }
+    },
+    "growth_stages": 16
   },
   "Do-not-eat-shroom": {
     "count": 16,
     "ingredients": {
       "Veilshroom": 42,
       "Scourroot": 23
-    }
+    },
+    "growth_stages": 8
   },
   "Duskbloom": {
     "count": 16,
@@ -96,34 +108,39 @@
       "Sunflower": 25,
       "Moonflower": 18,
       "Shadevine": 14
-    }
+    },
+    "growth_stages": 8
   },
   "Dustgrain": {
     "count": 72,
     "ingredients": {
       "Wheat Seeds": 27
-    }
+    },
+    "growth_stages": 1
   },
   "Fleshtrap": {
     "count": 16,
     "ingredients": {
       "Lonelily": 42,
       "Cindershade": 26
-    }
+    },
+    "growth_stages": 14
   },
   "Glasscorn": {
     "count": 9,
     "ingredients": {
       "Chloronite": 38,
       "Startlevine": 26
-    }
+    },
+    "growth_stages": 9
   },
   "Gloomgourd": {
     "count": 72,
     "ingredients": {
       "Pumpkin Seeds": 15,
       "Melon Seeds": 12
-    }
+    },
+    "growth_stages": 1
   },
   "Godseed": {
     "count": 4,
@@ -140,11 +157,13 @@
       "Sugar Cane": 2,
       "Nether Wart": 2,
       "Red Mushroom": 1
-    }
+    },
+    "growth_stages": 40
   },
   "Lonelily": {
     "count": 25,
-    "ingredients": {}
+    "ingredients": {},
+    "growth_stages": 1
   },
   "Magic Jellybean": {
     "count": 16,
@@ -160,49 +179,56 @@
     "ingredients": {
       "Lonelily": 38,
       "Duskbloom": 26
-    }
+    },
+    "growth_stages": 4
   },
   "Phantomleaf": {
     "count": 16,
     "ingredients": {
       "Shellfruit": 42,
       "Chorus Fruit": 24
-    }
+    },
+    "growth_stages": 15
   },
   "Plant Boy Advance": {
     "count": 4,
     "ingredients": {
       "Snoozling": 5,
       "Thunderling": 17
-    }
+    },
+    "growth_stages": 12
   },
   "Puffercloud": {
     "count": 11,
     "ingredients": {
       "Do-not-eat-shroom": 41,
       "Snoozling": 4
-    }
+    },
+    "growth_stages": 14
   },
   "Scourroot": {
     "count": 72,
     "ingredients": {
       "Potato": 15,
       "Carrot": 12
-    }
+    },
+    "growth_stages": 1
   },
   "Shadevine": {
     "count": 72,
     "ingredients": {
       "Cactus": 15,
       "Sugar Cane": 12
-    }
+    },
+    "growth_stages": 1
   },
   "Shellfruit": {
     "count": 84,
     "ingredients": {
       "Blastberry": 16,
       "TURTLELLINI": 84
-    }
+    },
+    "growth_stages": 1
   },
   "Snoozling": {
     "count": 4,
@@ -212,42 +238,48 @@
       "Creambloom": 10,
       "Thornshade": 6,
       "Duskbloom": 6
-    }
+    },
+    "growth_stages": 20
   },
   "Soggybud": {
     "count": 52,
     "ingredients": {
       "Melon Seeds": 26,
       "Gloomgourd": 21
-    }
+    },
+    "growth_stages": 10
   },
   "Startlevine": {
     "count": 16,
     "ingredients": {
       "Cheesebite": 42,
       "Blastberry": 24
-    }
+    },
+    "growth_stages": 12
   },
   "Stoplight Petal": {
     "count": 4,
     "ingredients": {
       "Snoozling": 4,
       "Noctilume": 7
-    }
+    },
+    "growth_stages": 12
   },
   "Thornshade": {
     "count": 16,
     "ingredients": {
       "Wild Rose": 42,
       "Veilshroom": 23
-    }
+    },
+    "growth_stages": 8
   },
   "Thunderling": {
     "count": 13,
     "ingredients": {
       "Soggybud": 41,
       "Noctilume": 9
-    }
+    },
+    "growth_stages": 16
   },
   "Timestalk": {
     "count": 16,
@@ -255,20 +287,23 @@
       "Shellfruit": 24,
       "Stoplight Petal": 24,
       "Chorus Fruit": 18
-    }
+    },
+    "growth_stages": 14
   },
   "TURTLELLINI": {
     "count": 16,
     "ingredients": {
       "Choconut": 42,
       "Soggybud": 23
-    }
+    },
+    "growth_stages": 1
   },
   "Witherbloom": {
     "count": 52,
     "ingredients": {
       "Dead Plants": 48
-    }
+    },
+    "growth_stages": 1
   },
   "Zombud": {
     "count": 16,
@@ -276,6 +311,7 @@
       "Dead Plants": 41,
       "Cindershade": 14,
       "Fleshtrap": 12
-    }
+    },
+    "growth_stages": 16
   }
 }
