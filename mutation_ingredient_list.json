@@ -1,6 +1,8 @@
 {
   "All-in Aloe": {
     "count": 16,
+    "growth_stages": 14,
+    "special_multiplier": 1.8,
     "ingredients": {
       "Magic Jellybean": 44,
       "Plant Boy Advance": 9
@@ -146,6 +148,8 @@
   },
   "Magic Jellybean": {
     "count": 16,
+    "growth_stages": 120,
+    "special_multiplier": 10.0,
     "ingredients": {
       "Sugar Cane": 49,
       "Duskbloom": 16

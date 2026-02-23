@@ -22,6 +22,16 @@ try:
 except Exception as e:
     print(f"Error loading manual data json: {e}")
 
+DEFAULT_GROWTH_STAGE_BY_MUTATION = {
+    "Magic Jellybean": 120,
+    "All-in Aloe": 14,
+}
+
+DEFAULT_SPECIAL_MULTIPLIER_BY_MUTATION = {
+    "Magic Jellybean": 10.0,
+    "All-in Aloe": 1.8,
+}
+
 @app.get("/api/ping")
 def ping():
     return {"status": "ok"}
@@ -130,16 +140,9 @@ def get_leaderboard(
         # 2. Return per Batch (One Harvest)
         expected_drops_value = 0
         
-        # Calculate dynamic growth stages & multipliers
-        growth_stages = 30
-        special_mult = 1.0
-        
-        if mut_name == 'Magic Jellybean':
-            growth_stages = 120
-            special_mult = 10.0
-        elif mut_name == 'All-in Aloe':
-            growth_stages = 14 # Optimal mathematical stage to harvest before it likely resets
-            special_mult = 1.8
+        # Growth stage and special multiplier can be overridden per mutation in mutation_ingredient_list.json
+        growth_stages = int(m_data.get("growth_stages", DEFAULT_GROWTH_STAGE_BY_MUTATION.get(mut_name, 30)))
+        special_mult = float(m_data.get("special_multiplier", DEFAULT_SPECIAL_MULTIPLIER_BY_MUTATION.get(mut_name, 1.0)))
             
         estimated_time = growth_stages * cycle_time_hours
         

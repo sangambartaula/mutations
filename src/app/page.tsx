@@ -412,7 +412,7 @@ export default function Home() {
                         <td className="px-6 py-4 text-center">
                           {idx === 0 ? (
                             <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-400 font-bold text-xs ring-1 ring-amber-500/20">
-                              !
+                              {idx + 1}
                             </span>
                           ) : (
                             <span className="text-neutral-400 font-mono">{idx + 1}</span>
