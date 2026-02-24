@@ -103,8 +103,13 @@ const toMutationLabel = (mutation: string) => {
 };
 const toMutationIconPath = (mutationName: string) =>
   `/icons/mutations/${mutationName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}.png`;
-const profitPerCycleTooltip =
-  "Expected profit per global growth tick. Actual harvests are random and can be bursty, especially for low spawn rates.";
+const profitPerCycleTooltipLines = [
+  "Expected profit per global growth tick (long-run average).",
+  "Model: independent spots using a steady-state renewal process.",
+  "Profit / Cycle = (N * v_net) / ((1 / p) + g).",
+  "Profit / Hour = Profit / Cycle / tau.",
+  "Actual harvests are random and can be bursty, especially for low spawn rates.",
+];
 
 export default function Home() {
   const [plots, setPlots] = useState(3);
@@ -816,7 +821,7 @@ export default function Home() {
                         <th className="px-6 py-4 font-semibold text-right text-sky-600 dark:text-sky-400 hidden lg:table-cell">
                           <div className="inline-flex items-center justify-end gap-2">
                             <button type="button" onClick={() => toggleSort("cycle_profit")} className="inline-flex items-center gap-1">
-                              Profit / Cycle (long-run average) <span aria-hidden="true">{sortIndicator("cycle_profit")}</span>
+                              Profit / Cycle <span aria-hidden="true">{sortIndicator("cycle_profit")}</span>
                             </button>
                             <div className="group relative">
                               <span
@@ -826,8 +831,12 @@ export default function Home() {
                               >
                                 i
                               </span>
-                              <div className="pointer-events-none absolute right-0 bottom-full mb-2 w-72 rounded bg-neutral-900 px-2 py-2 text-left text-[11px] font-normal normal-case tracking-normal text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 z-10">
-                                {profitPerCycleTooltip}
+                              <div className="absolute left-1/2 top-full z-20 mt-2 w-80 -translate-x-1/2 rounded bg-neutral-900 px-3 py-2 text-left text-[11px] font-normal normal-case tracking-normal text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                                {profitPerCycleTooltipLines.map((line) => (
+                                  <p key={line} className="leading-snug">
+                                    {line}
+                                  </p>
+                                ))}
                               </div>
                             </div>
                           </div>
