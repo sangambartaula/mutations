@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { ModeToggle } from "@/components/mode-toggle";
-import { Coins, Sprout, Clock, Calculator, Loader2, ArrowUpRight, AlertTriangle, X, Info } from "lucide-react";
+import { Coins, Sprout, Clock, Calculator, Loader2, ArrowUpRight, AlertTriangle, X } from "lucide-react";
 
 type OptimizationMode = "profit" | "smart" | "target";
 type SetupMode = "buy_order" | "insta_buy";
@@ -43,8 +43,6 @@ type MutationBreakdown = {
   total_revenue: number;
   growth_stages: number;
   estimated_time_hours: number;
-  expected_fill_cycles?: number;
-  expected_fill_time_hours?: number;
 };
 
 type LeaderboardItem = {
@@ -249,7 +247,7 @@ export default function Home() {
 
   const sortValue = (item: LeaderboardItem, key: SortKey) => {
     if (key === "mutation") return item.mutationName.toLowerCase();
-    if (key === "cycles") return item.breakdown.expected_fill_cycles ?? item.breakdown.growth_stages;
+    if (key === "cycles") return item.breakdown.growth_stages;
     if (key === "setup") return item.opt_cost;
     if (key === "profitCycle") return item.profit_per_cycle ?? 0;
     if (key === "value") {
@@ -612,12 +610,6 @@ export default function Home() {
                       <th className="px-6 py-4 font-semibold text-right hidden md:table-cell">
                         <button type="button" onClick={() => toggleSort("cycles")} className="inline-flex items-center gap-1">
                           Growth Cycles <span aria-hidden="true">{sortIndicator("cycles")}</span>
-                          <span className="group relative inline-flex ml-1">
-                            <Info className="w-3.5 h-3.5 text-neutral-400" />
-                            <span className="pointer-events-none absolute bottom-full right-0 mb-2 w-72 p-2 rounded bg-neutral-900 text-[11px] normal-case text-white opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                              Profit/Cycle assumes one harvest after all mutation slots are expected to fill (expected-value model).
-                            </span>
-                          </span>
                         </button>
                       </th>
                       <th className="px-6 py-4 font-semibold text-right hidden lg:table-cell">
@@ -681,10 +673,10 @@ export default function Home() {
                           {formatCoins(item.profit_per_cycle)}
                         </td>
                         <td className="px-6 py-4 text-right font-mono text-neutral-500 hidden md:table-cell">
-                          {(item.breakdown.expected_fill_cycles ?? item.breakdown.growth_stages).toFixed(2)} Cycles
+                          {item.breakdown.growth_stages} Cycles
                         </td>
                         <td className="px-6 py-4 text-right font-mono text-neutral-500 hidden lg:table-cell">
-                          {formatDuration(item.breakdown.expected_fill_time_hours ?? item.breakdown.estimated_time_hours)}
+                          {formatDuration(item.breakdown.estimated_time_hours)}
                         </td>
                         <td className="px-6 py-4 text-right font-mono opacity-[0.65] hidden sm:table-cell">
                           {formatCoins(item.opt_cost)}
@@ -699,7 +691,7 @@ export default function Home() {
           </div>
 
           <div className="rounded-xl border border-amber-200/70 bg-amber-50/80 px-4 py-3 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
-            Profit/Cycle assumes you harvest all at once after mutation slots are expected to fill. Results are based on community-tested assumptions; verify key values in-game before large orders.
+            Profit/Cycle is calculated as Profit/Harvest divided by Growth Cycles. Results are based on community-tested assumptions; verify key values in-game before large orders.
           </div>
         </main>
       </div>
@@ -780,16 +772,6 @@ export default function Home() {
                     <span className="text-xs font-medium text-blue-600 dark:text-blue-400">Estimated Lifecycle Time:</span>
                     <span className="text-sm font-black text-blue-700 dark:text-blue-300">{formatDuration(selectedMutation.breakdown.estimated_time_hours)}</span>
                   </div>
-                  {typeof selectedMutation.breakdown.expected_fill_cycles === "number" && (
-                    <div className="flex items-center justify-between pt-2 border-t border-blue-500/20">
-                      <span className="text-xs font-medium text-blue-600 dark:text-blue-400">Expected Fill Cycles (used for Profit/Cycle):</span>
-                      <span className="text-sm font-black text-blue-700 dark:text-blue-300">
-                        {selectedMutation.breakdown.expected_fill_cycles.toFixed(2)} Cycles
-                        {" "}
-                        ({formatDuration(selectedMutation.breakdown.expected_fill_time_hours ?? 0)})
-                      </span>
-                    </div>
-                  )}
                 </div>
 
                 {selectedMutation.breakdown.yields && selectedMutation.breakdown.yields.length > 0 ? (
