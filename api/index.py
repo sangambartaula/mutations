@@ -3,6 +3,7 @@ import io
 import os
 import json
 import time
+import math
 from collections import defaultdict, deque
 from threading import Lock
 from typing import Dict, Any, Deque, List
@@ -247,6 +248,15 @@ def get_leaderboard(
                 return market.get('sellPrice', market.get('buyPrice', 0))
             else: # sell_offer
                 return market.get('buyPrice', market.get('sellPrice', 0))
+
+    def finite_or_none(value: Any) -> float | None:
+        if isinstance(value, (int, float)) and math.isfinite(float(value)):
+            return float(value)
+        return None
+
+    def finite_or_zero(value: Any) -> float:
+        finite = finite_or_none(value)
+        return finite if finite is not None else 0.0
                 
     for row in reader:
         cleaned_row = {k.strip(): v for k, v in row.items()}
@@ -378,19 +388,19 @@ def get_leaderboard(
 
         # 3. Profit metrics
         profit_batch = total_cycle_revenue - opt_cost
-        profit_per_cycle = (profit_batch / growth_stages) if growth_stages > 0 else 0.0
-        profit_per_hour = (profit_batch / estimated_time) if estimated_time > 0 else 0.0
 
         # Growth-stage mapping from product requirements:
         # growth_stages is cycles AFTER spawn until harvestable, so g = growth_stages exactly.
         try:
+            # Include harvest-time multiplier in v so renewal model v_net captures conditional bonuses.
+            harvest_value_with_multiplier = mut_sell_price_value * effective_special_mult
             profit_models = compute_profit_rates({
                 "m": plots,
                 "x": int(base_limit),
                 "p": mutation_chance_effective,
                 "tau": cycle_time_hours,
                 "g": growth_stages,
-                "v": mut_sell_price_value,
+                "v": harvest_value_with_multiplier,
                 "per_harvest_cost": per_harvest_cost,
             })
         except ValueError as exc:
@@ -409,7 +419,9 @@ def get_leaderboard(
                 "v_net": None,
                 "warnings": [f"profit model error: {exc}"],
             }
-        hourly_profit_selected = profit_models.get("profit_per_hour")
+        profit_per_cycle = finite_or_zero(profit_models.get("profit_per_cycle"))
+        profit_per_hour = finite_or_zero(profit_models.get("profit_per_hour"))
+        hourly_profit_selected = finite_or_none(profit_models.get("profit_per_hour"))
 
         payback_hours_ready = (opt_cost / hourly_profit_selected) if (hourly_profit_selected is not None and hourly_profit_selected > 0) else None
         
