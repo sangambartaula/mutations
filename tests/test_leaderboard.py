@@ -211,6 +211,57 @@ class LeaderboardTests(unittest.TestCase):
 
         self.assertAlmostEqual(jellybean["profit_per_cycle"], expected["profit_per_cycle"], places=6)
 
+    @patch("api.index.get_bazaar_prices", return_value={"All-in Aloe": {"buyPrice": 1_250_000, "sellPrice": 1_000_000}})
+    def test_all_in_aloe_profit_per_cycle_uses_effective_special_multiplier(self, _mock_prices):
+        plots = 1
+        result = get_leaderboard(
+            plots=plots,
+            fortune=2500,
+            gh_upgrade=9,
+            unique_crops=12,
+            mode="profit",
+            setup_mode="buy_order",
+            sell_mode="sell_offer",
+            target_crop=None,
+            maxed_crops="",
+            mutation_chance=0.25,
+        )
+
+        aloe = next((m for m in result["leaderboard"] if m["mutationName"] == "All-in Aloe"), None)
+        self.assertIsNotNone(aloe)
+
+        aloe_data = MANUAL_DATA["All-in Aloe"]
+        special = float(
+            aloe_data.get(
+                "effective_special_multiplier",
+                aloe_data.get(
+                    "special_multiplier",
+                    DEFAULT_SPECIAL_MULTIPLIER_BY_MUTATION.get("All-in Aloe", 1.0),
+                ),
+            )
+        )
+
+        cycle_time_hours = result["metadata"]["cycle_time_hours"]
+        base_inputs = {
+            "m": plots,
+            "x": aloe["breakdown"]["base_limit"],
+            "p": aloe["hourly"]["p"],
+            "tau": cycle_time_hours,
+            "g": aloe["breakdown"]["growth_stages"],
+            "per_harvest_cost": 0.0,
+        }
+        expected_with_special = compute_profit_rates({
+            **base_inputs,
+            "v": aloe["mut_price"] * special,
+        })
+        expected_without_special = compute_profit_rates({
+            **base_inputs,
+            "v": aloe["mut_price"],
+        })
+
+        self.assertAlmostEqual(aloe["profit_per_cycle"], expected_with_special["profit_per_cycle"], places=6)
+        self.assertNotAlmostEqual(aloe["profit_per_cycle"], expected_without_special["profit_per_cycle"], places=6)
+
     @patch("api.index.get_bazaar_prices", return_value={})
     def test_lonelily_override_affects_profit_mode_mutation_count(self, _mock_prices):
         result = get_leaderboard(
