@@ -2,6 +2,12 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   async headers() {
+    // Next.js dev mode uses inline scripts and HMR plumbing that strict CSP blocks.
+    // Keep hard security headers for production only.
+    if (process.env.NODE_ENV === "development") {
+      return [];
+    }
+
     return [
       {
         source: "/:path*",
