@@ -328,15 +328,18 @@ export default function Home() {
     return `${hrs}h ${mins}m`;
   };
 
+  const formatGrowthCyclesDisplay = (cycles: number) => {
+    if (cycles <= 1) return "0";
+    return `${cycles} Cycles`;
+  };
+
   const getGrowthCyclesLabel = (item: LeaderboardItem) => {
     const g = item.hourly?.g;
     if (typeof g === "number") {
-      if (g === 0) return "Instant";
-      return `${g} Cycles`;
+      return formatGrowthCyclesDisplay(g);
     }
     const fallback = item.breakdown.growth_stages;
-    if (fallback === 0) return "Instant";
-    return `${fallback} Cycles`;
+    return formatGrowthCyclesDisplay(fallback);
   };
 
   const formatYieldCalculation = (math: YieldMath, unitPrice: number) => {
@@ -1040,7 +1043,7 @@ export default function Home() {
                       Growth Cycles:
                     </div>
                     <span className="bg-blue-600 text-white px-3 py-1 rounded-lg text-xs font-black">
-                      {selectedMutation.hourly?.g === 0 ? "Instant" : `${selectedMutation.hourly?.g ?? selectedMutation.breakdown.growth_stages} Cycles`}
+                      {formatGrowthCyclesDisplay(selectedMutation.hourly?.g ?? selectedMutation.breakdown.growth_stages)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between pt-2 border-t border-blue-500/20">
