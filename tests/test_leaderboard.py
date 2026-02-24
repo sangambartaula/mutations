@@ -87,23 +87,17 @@ class LeaderboardTests(unittest.TestCase):
         )
 
         for mutation in result["leaderboard"]:
+            model_cycle = mutation["hourly"]["profit_per_cycle"]
+            model_hour = mutation["hourly"]["profit_per_hour"]
             cycle_time_hours = mutation["hourly"]["tau_hours"]
-            expected_cycles = mutation["hourly"]["cycles_per_harvest_per_spot"]
-            self.assertGreater(expected_cycles, 0)
 
-            expected_cycle = mutation["profit"] / expected_cycles
-            expected_hour = expected_cycle / cycle_time_hours
-
-            self.assertAlmostEqual(mutation["profit_per_cycle"], expected_cycle, places=6)
-            self.assertAlmostEqual(mutation["profit_per_hour"], expected_hour, places=6)
-
-            # Setup-amortized cycle metric should keep the same sign as per-harvest net.
-            if mutation["profit"] > 0:
-                self.assertGreater(mutation["profit_per_cycle"], 0)
-            elif mutation["profit"] < 0:
-                self.assertLess(mutation["profit_per_cycle"], 0)
-            else:
-                self.assertEqual(mutation["profit_per_cycle"], 0)
+            self.assertAlmostEqual(mutation["profit_per_cycle"], model_cycle, places=6)
+            self.assertAlmostEqual(mutation["profit_per_hour"], model_hour, places=6)
+            self.assertAlmostEqual(
+                mutation["profit_per_hour"],
+                mutation["profit_per_cycle"] / cycle_time_hours,
+                places=6,
+            )
 
     @patch("api.index.get_bazaar_prices", return_value={})
     def test_profit_per_cycle_and_per_harvest_are_distinct_metrics(self, _mock_prices):
@@ -167,8 +161,7 @@ class LeaderboardTests(unittest.TestCase):
             "per_harvest_cost": 50.0,
         })
 
-        # Top-level cycle metric is setup-amortized. Renewal-model operating cycle remains exposed in hourly.
-        self.assertAlmostEqual(jellybean["hourly"]["profit_per_cycle"], expected["profit_per_cycle"], places=6)
+        self.assertAlmostEqual(jellybean["profit_per_cycle"], expected["profit_per_cycle"], places=6)
 
     @patch("api.index.get_bazaar_prices", return_value={})
     def test_lonelily_override_affects_profit_mode_mutation_count(self, _mock_prices):

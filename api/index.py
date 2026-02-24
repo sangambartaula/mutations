@@ -419,15 +419,8 @@ def get_leaderboard(
                 "v_net": None,
                 "warnings": [f"profit model error: {exc}"],
             }
-        expected_cycles_per_harvest = finite_or_none(profit_models.get("cycles_per_harvest_per_spot"))
-        if expected_cycles_per_harvest is not None and expected_cycles_per_harvest > 0:
-            # Amortize one-time setup across the expected cycles needed for one harvest window.
-            # This keeps cycle economics aligned with per-harvest net profitability sign.
-            profit_per_cycle = float(profit_batch) / expected_cycles_per_harvest
-        else:
-            profit_per_cycle = 0.0
-
-        profit_per_hour = (profit_per_cycle / cycle_time_hours) if cycle_time_hours > 0 else 0.0
+        profit_per_cycle = finite_or_zero(profit_models.get("profit_per_cycle"))
+        profit_per_hour = finite_or_zero(profit_models.get("profit_per_hour"))
         hourly_profit_selected = finite_or_none(profit_models.get("profit_per_hour"))
 
         payback_hours_ready = (opt_cost / hourly_profit_selected) if (hourly_profit_selected is not None and hourly_profit_selected > 0) else None
