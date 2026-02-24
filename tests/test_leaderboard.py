@@ -169,10 +169,6 @@ class LeaderboardTests(unittest.TestCase):
             target_crop=None,
             maxed_crops="",
             mutation_chance=0.25,
-            harvest_strategy="ready",
-            batch_hours=24.0,
-            boost_cost=1000.0,
-            boosted_value_override=120.0,
             per_harvest_cost=5.0,
         )
 
@@ -187,14 +183,9 @@ class LeaderboardTests(unittest.TestCase):
             "tau": cycle_time_hours,
             "g": lonelily["breakdown"]["growth_stages"],
             "v": lonelily["mut_price"],
-            "v_boost": 120.0,
-            "B": 1000.0,
-            "H": 24.0,
             "per_harvest_cost": 5.0,
         })
 
-        self.assertAlmostEqual(lonelily["hourly"]["profit_per_hour_ready"], expected["profit_per_hour"], places=6)
-        self.assertAlmostEqual(lonelily["hourly"]["profit_per_hour_batch"], expected["batch"]["profit_per_hour_batch"], places=6)
         self.assertAlmostEqual(lonelily["hourly"]["profit_per_hour_selected"], expected["profit_per_hour"], places=6)
 
 

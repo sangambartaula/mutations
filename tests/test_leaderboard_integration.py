@@ -17,10 +17,6 @@ def test_leaderboard_exposes_profit_models_and_no_nan(_mock_prices):
         target_crop=None,
         maxed_crops="",
         mutation_chance=0.0002,
-        harvest_strategy="batch",
-        batch_hours=24.0,
-        boost_cost=100000.0,
-        boosted_value_override=1200.0,
         per_harvest_cost=0.0,
     )
 
@@ -42,7 +38,6 @@ def test_leaderboard_exposes_profit_models_and_no_nan(_mock_prices):
         "harvests_per_hour",
         "profit_per_cycle",
         "profit_per_hour",
-        "batch",
         "warnings",
     ]:
         assert key in pm
@@ -61,6 +56,4 @@ def test_leaderboard_exposes_profit_models_and_no_nan(_mock_prices):
     ]:
         assert math.isfinite(pm[key])
 
-    for key in ["H", "w", "teff_hours", "harvests_per_hour_batch", "harvests_per_cycle_batch", "boost_cost_hr", "profit_per_hour_batch", "profit_per_cycle_batch"]:
-        assert key in pm["batch"]
-        assert pm["batch"][key] is None or math.isfinite(pm["batch"][key])
+    assert "batch" not in pm

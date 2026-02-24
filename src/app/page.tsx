@@ -8,9 +8,8 @@ import Image from "next/image";
 type OptimizationMode = "profit" | "smart" | "target";
 type SetupMode = "buy_order" | "insta_buy";
 type SellMode = "sell_offer" | "insta_sell";
-type SortKey = "rank" | "mutation" | "value" | "profitCycle" | "cycles" | "setup";
+type SortKey = "rank" | "mutation" | "value" | "cycles" | "setup";
 type SortDirection = "asc" | "desc";
-type HarvestStrategy = "ready" | "batch";
 
 type YieldMath = {
   base: number;
@@ -60,14 +59,9 @@ type LeaderboardItem = {
   limit: number;
   smart_progress?: Record<string, number>;
   hourly?: {
-    profit_per_cycle?: number | null;
     profit_per_hour_selected?: number | null;
     g?: number | null;
     warnings?: string[];
-    batch?: {
-      profit_per_cycle_batch?: number | null;
-      profit_per_hour_batch?: number | null;
-    };
   };
   breakdown: MutationBreakdown;
 };
@@ -117,10 +111,6 @@ export default function Home() {
   const [useInfiniVacuum, setUseInfiniVacuum] = useState(false);
   const [useDarkCacao, setUseDarkCacao] = useState(false);
   const [hyperchargeLevel, setHyperchargeLevel] = useState(0);
-  const [harvestStrategy, setHarvestStrategy] = useState<HarvestStrategy>("ready");
-  const [batchHours, setBatchHours] = useState(0);
-  const [boostCost, setBoostCost] = useState(0);
-  const [boostedValueOverride, setBoostedValueOverride] = useState<string>("");
   const [ghUpgrade, setGhUpgrade] = useState(9);
   const [uniqueCrops, setUniqueCrops] = useState(12);
 
@@ -188,10 +178,6 @@ export default function Home() {
           infini_vacuum: useInfiniVacuum ? "true" : "false",
           dark_cacao: useDarkCacao ? "true" : "false",
           hypercharge_level: hyperchargeLevel.toString(),
-          harvest_strategy: harvestStrategy,
-          batch_hours: batchHours.toString(),
-          boost_cost: boostCost.toString(),
-          ...(boostedValueOverride.trim() !== "" ? { boosted_value_override: boostedValueOverride.trim() } : {}),
           gh_upgrade: ghUpgrade.toString(),
           unique_crops: uniqueCrops.toString(),
           mode: mode,
@@ -219,10 +205,6 @@ export default function Home() {
     useInfiniVacuum,
     useDarkCacao,
     hyperchargeLevel,
-    harvestStrategy,
-    batchHours,
-    boostCost,
-    boostedValueOverride,
     ghUpgrade,
     uniqueCrops,
     mode,
@@ -252,17 +234,6 @@ export default function Home() {
     if (hrs === 0) return `${mins}m`;
     if (mins === 0) return `${hrs}h`;
     return `${hrs}h ${mins}m`;
-  };
-
-  const getRowProfitPerCycle = (item: LeaderboardItem) => {
-    if (harvestStrategy === "batch") {
-      return item.hourly?.batch?.profit_per_cycle_batch ?? item.hourly?.profit_per_cycle ?? item.profit_per_cycle ?? 0;
-    }
-    return item.hourly?.profit_per_cycle ?? item.profit_per_cycle ?? 0;
-  };
-
-  const getRowProfitPerHourSelected = (item: LeaderboardItem) => {
-    return item.hourly?.profit_per_hour_selected ?? item.profit_per_hour ?? 0;
   };
 
   const getGrowthCyclesLabel = (item: LeaderboardItem) => {
@@ -335,7 +306,6 @@ export default function Home() {
     if (key === "mutation") return item.mutationName.toLowerCase();
     if (key === "cycles") return item.hourly?.g ?? item.breakdown.growth_stages;
     if (key === "setup") return item.opt_cost;
-    if (key === "profitCycle") return getRowProfitPerCycle(item);
     if (key === "value") {
       if (mode === "smart") {
         if (activeSmartTab !== "all") return item.smart_progress?.[activeSmartTab] ?? 0;
@@ -564,54 +534,6 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="mb-6 rounded-xl border border-neutral-200 dark:border-neutral-800 p-3 space-y-3">
-              <p className="text-sm font-medium">Harvest Strategy</p>
-              <div className="flex bg-neutral-100 dark:bg-neutral-800 rounded-xl p-1">
-                <button
-                  onClick={() => setHarvestStrategy("ready")}
-                  className={`flex-1 text-xs py-1.5 rounded-lg transition-colors ${harvestStrategy === "ready" ? "bg-white dark:bg-neutral-700 shadow-sm font-medium" : "text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"}`}
-                >
-                  Harvest when ready
-                </button>
-                <button
-                  onClick={() => setHarvestStrategy("batch")}
-                  className={`flex-1 text-xs py-1.5 rounded-lg transition-colors ${harvestStrategy === "batch" ? "bg-white dark:bg-neutral-700 shadow-sm font-medium" : "text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"}`}
-                >
-                  Batch harvest
-                </button>
-              </div>
-
-              {harvestStrategy === "batch" && (
-                <div className="space-y-2">
-                  <label className="text-xs font-medium block">Batch Hours (H)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={batchHours}
-                    onChange={(e) => setBatchHours(Math.max(0, Number(e.target.value) || 0))}
-                    className="w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1 text-sm"
-                  />
-                  <label className="text-xs font-medium block">Boost Cost (B)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={boostCost}
-                    onChange={(e) => setBoostCost(Math.max(0, Number(e.target.value) || 0))}
-                    className="w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1 text-sm"
-                  />
-                  <label className="text-xs font-medium block">Boosted Value Override (optional)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={boostedValueOverride}
-                    onChange={(e) => setBoostedValueOverride(e.target.value)}
-                    placeholder="Leave blank to use base value"
-                    className="w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1 text-sm"
-                  />
-                </div>
-              )}
-            </div>
-
             {/* Greenhouse Upgrade Slider */}
             <div className="mb-6">
               <label className="flex justify-between text-sm font-medium mb-2">
@@ -789,11 +711,6 @@ export default function Home() {
                           </button>
                         </th>
                       )}
-                      <th className="px-6 py-4 font-semibold text-right hidden lg:table-cell text-emerald-600 dark:text-emerald-400">
-                        <button type="button" onClick={() => toggleSort("profitCycle")} className="inline-flex items-center gap-1">
-                          Profit / Cycle <span aria-hidden="true">{sortIndicator("profitCycle")}</span>
-                        </button>
-                      </th>
                       <th className="px-6 py-4 font-semibold text-right hidden md:table-cell">
                         <button type="button" onClick={() => toggleSort("cycles")} className="inline-flex items-center gap-1">
                           Growth Cycles <span aria-hidden="true">{sortIndicator("cycles")}</span>
@@ -864,16 +781,18 @@ export default function Home() {
                                   </div>
                                 </div>
                               )}
+                              {item.mutationName === "Devourer" && (
+                                <div className="group relative">
+                                  <AlertTriangle className="w-4 h-4 text-red-500 hover:text-red-400" />
+                                  <div className="absolute bottom-full right-0 mb-2 w-64 p-2 bg-neutral-900 text-xs text-white rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 text-left font-sans tracking-wide">
+                                    This crop destroys surrounding crops over time. You must remove adjacent blocks to prevent spread. It is not advised to try and grow all 16 at once but it is possible.
+                                  </div>
+                                </div>
+                              )}
                               {formatCoins(mode === "target" ? item.score : item.profit)}
                             </div>
                           </td>
                         )}
-                        <td
-                          className="px-6 py-4 text-right font-mono hidden lg:table-cell text-emerald-600 dark:text-emerald-400"
-                          title={`Profit/Hour (${harvestStrategy === "batch" ? "batch" : "ready"}): ${formatCoins(getRowProfitPerHourSelected(item))}`}
-                        >
-                          {formatCoins(getRowProfitPerCycle(item))}
-                        </td>
                         <td className="px-6 py-4 text-right font-mono text-neutral-500 hidden md:table-cell">
                           {getGrowthCyclesLabel(item)}
                         </td>
@@ -893,7 +812,7 @@ export default function Home() {
           </div>
 
           <div className="rounded-xl border border-amber-200/70 bg-amber-50/80 px-4 py-3 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
-            Profit/Cycle and Profit/Hour use the expected-value global growth-cycle model from the API. Results are based on community-tested assumptions; verify key values in-game before large orders.
+            Expected values use the global growth-cycle model from the API. Results are based on community-tested assumptions; verify key values in-game before large orders.
           </div>
         </main>
       </div>
@@ -934,6 +853,11 @@ export default function Home() {
                 You can plant <span className="font-bold">{selectedMutation.breakdown.base_limit}x {toMutationLabel(selectedMutation.mutationName)}</span> in 1 Plot.
                 <br />With {plots} plot(s) total ({selectedMutation.limit}x {toMutationLabel(selectedMutation.mutationName)}), {selectedMutation.breakdown.ingredients.length === 0 ? "this requires no ingredients!" : "this requires:"}
               </div>
+              {selectedMutation.mutationName === "Devourer" && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 text-sm text-red-800 dark:text-red-200">
+                  This crop destroys surrounding crops over time. You must remove adjacent blocks to prevent spread. It is not advised to try and grow all 16 at once but it is possible.
+                </div>
+              )}
 
               {selectedMutation.breakdown.ingredients.length > 0 && (
                 <div className="space-y-3">

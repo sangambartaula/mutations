@@ -3,7 +3,7 @@ import io
 import os
 import json
 from fastapi import FastAPI, Query
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 from mut_calc import compute_profit_rates
 
@@ -65,10 +65,6 @@ def get_leaderboard(
     infini_vacuum: bool = Query(False),
     dark_cacao: bool = Query(False),
     hypercharge_level: int = Query(0, ge=0, le=20),
-    harvest_strategy: str = Query("ready"),  # "ready" | "batch"
-    batch_hours: float = Query(0.0, ge=0.0),
-    boost_cost: float = Query(0.0, ge=0.0),
-    boosted_value_override: Optional[float] = Query(None),
     per_harvest_cost: float = Query(0.0, ge=0.0),
 ) -> Dict[str, Any]:
     # Normalize FastAPI Query defaults when function is called directly in tests/scripts.
@@ -82,19 +78,8 @@ def get_leaderboard(
         custom_time_hours = 24.0
     if not isinstance(hypercharge_level, int):
         hypercharge_level = 0
-    if not isinstance(harvest_strategy, str):
-        harvest_strategy = "ready"
-    if not isinstance(batch_hours, (int, float)):
-        batch_hours = 0.0
-    if not isinstance(boost_cost, (int, float)):
-        boost_cost = 0.0
-    if boosted_value_override is not None and not isinstance(boosted_value_override, (int, float)):
-        boosted_value_override = None
     if not isinstance(per_harvest_cost, (int, float)):
         per_harvest_cost = 0.0
-    harvest_strategy = harvest_strategy.lower().strip()
-    if harvest_strategy not in {"ready", "batch"}:
-        harvest_strategy = "ready"
     
     # Load Data
     bazaar_data = get_bazaar_prices()
@@ -284,7 +269,6 @@ def get_leaderboard(
 
         # Growth-stage mapping from product requirements:
         # growth_stages is cycles AFTER spawn until harvestable, so g = growth_stages exactly.
-        per_mut_boost_price = float(boosted_value_override) if boosted_value_override is not None else mut_sell_price_value
         try:
             profit_models = compute_profit_rates({
                 "m": plots,
@@ -293,9 +277,6 @@ def get_leaderboard(
                 "tau": cycle_time_hours,
                 "g": growth_stages,
                 "v": mut_sell_price_value,
-                "v_boost": per_mut_boost_price,
-                "B": boost_cost,
-                "H": batch_hours,
                 "per_harvest_cost": per_harvest_cost,
             })
         except ValueError as exc:
@@ -312,27 +293,11 @@ def get_leaderboard(
                 "profit_per_cycle": None,
                 "profit_per_hour": None,
                 "v_net": None,
-                "batch": {
-                    "H": None,
-                    "w": None,
-                    "teff_hours": None,
-                    "harvests_per_hour_batch": None,
-                    "harvests_per_cycle_batch": None,
-                    "boost_cost_hr": None,
-                    "profit_per_hour_batch": None,
-                    "profit_per_cycle_batch": None,
-                },
                 "warnings": [f"profit model error: {exc}"],
             }
-        hourly_profit_ready = profit_models.get("profit_per_hour")
-        hourly_profit_batch = profit_models.get("batch", {}).get("profit_per_hour_batch")
-        if harvest_strategy == "batch" and hourly_profit_batch is not None:
-            hourly_profit_selected = hourly_profit_batch
-        else:
-            hourly_profit_selected = hourly_profit_ready
+        hourly_profit_selected = profit_models.get("profit_per_hour")
 
-        payback_hours_ready = (opt_cost / hourly_profit_ready) if (hourly_profit_ready is not None and hourly_profit_ready > 0) else None
-        payback_hours_batch = (opt_cost / hourly_profit_batch) if (hourly_profit_batch is not None and hourly_profit_batch > 0) else None
+        payback_hours_ready = (opt_cost / hourly_profit_selected) if (hourly_profit_selected is not None and hourly_profit_selected > 0) else None
         
         # 4. Scoring Logic
         score = 0
@@ -375,10 +340,7 @@ def get_leaderboard(
             "smart_progress": smart_progress,
             "hourly": {
                 "mutation_chance": mutation_chance_effective,
-                "strategy": harvest_strategy,
                 "profit_per_hour_selected": hourly_profit_selected,
-                "profit_per_hour_ready": hourly_profit_ready,
-                "profit_per_hour_batch": hourly_profit_batch,
                 "tau_hours": profit_models.get("tau_hours"),
                 "p": profit_models.get("p"),
                 "g": profit_models.get("g"),
@@ -389,14 +351,8 @@ def get_leaderboard(
                 "harvests_per_hour": profit_models.get("harvests_per_hour"),
                 "profit_per_cycle": profit_models.get("profit_per_cycle"),
                 "profit_per_hour": profit_models.get("profit_per_hour"),
-                "rate_ready": profit_models.get("harvests_per_hour"),
-                "rate_batch": profit_models.get("batch", {}).get("harvests_per_hour_batch"),
-                "t0_hours": profit_models.get("hours_per_harvest_per_spot"),
-                "teff_hours": profit_models.get("batch", {}).get("teff_hours"),
                 "warnings": profit_models.get("warnings", []),
-                "batch": profit_models.get("batch", {}),
                 "payback_hours_ready": payback_hours_ready,
-                "payback_hours_batch": payback_hours_batch,
                 # Legacy fields retained for backward compatibility:
                 "harvest_mode": harvest_mode,
                 "custom_time_hours": custom_time_hours if harvest_mode == "custom_time" else None,

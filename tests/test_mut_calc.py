@@ -62,25 +62,6 @@ def test_tiny_p_is_finite_and_warns():
     assert len(result["warnings"]) == 0  # warning threshold is 1e6 cycles
 
 
-def test_batch_mode_throughput_and_profit_behavior():
-    base = {
-        "m": 3,
-        "x": 16,
-        "p": 0.25,
-        "tau": 2.0,
-        "g": 4,
-        "v": 50_000,
-        "v_boost": 65_000,
-        "B": 500_000,
-    }
-    small_h = compute_profit_rates({**base, "H": 0.01})
-    large_h = compute_profit_rates({**base, "H": 1_000_000.0})
-
-    assert small_h["batch"]["harvests_per_hour_batch"] < small_h["harvests_per_hour"]
-    assert large_h["batch"]["harvests_per_hour_batch"] < large_h["harvests_per_hour"]
-    assert small_h["batch"]["boost_cost_hr"] > large_h["batch"]["boost_cost_hr"]
-
-
 def test_invalid_inputs_rejected():
     invalid = [
         {"m": 3, "x": 16, "p": 0.0, "tau": 2.0, "g": 0, "v": 1},
@@ -89,7 +70,6 @@ def test_invalid_inputs_rejected():
         {"m": 0, "x": 16, "p": 0.25, "tau": 2.0, "g": 0, "v": 1},
         {"m": 3, "x": 0, "p": 0.25, "tau": 2.0, "g": 0, "v": 1},
         {"m": 3, "x": 16, "p": 0.25, "tau": 2.0, "g": -1, "v": 1},
-        {"m": 3, "x": 16, "p": 0.25, "tau": 2.0, "g": 0, "v": 1, "H": -1},
     ]
 
     for case in invalid:

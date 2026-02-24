@@ -40,8 +40,6 @@ def compute_profit_rates(inputs: Dict[str, Any]) -> Dict[str, Any]:
     - g: required growth cycles AFTER spawn until harvestable (g=0 instant)
     - v: gross coins per harvested mature mutation
     - per_harvest_cost: optional per harvested mutation cost (subtracted from v)
-    - H, B, v_boost: optional batch strategy params
-
     Core formulas:
     - N = m * x
     - cycles_per_harvest_per_spot = 1/p + g
@@ -51,12 +49,6 @@ def compute_profit_rates(inputs: Dict[str, Any]) -> Dict[str, Any]:
     - profit_per_hour = harvests_per_hour * (v - per_harvest_cost)
     - profit_per_cycle = harvests_per_cycle * (v - per_harvest_cost)
 
-    Optional batch strategy (H > 0):
-    - w = H/2
-    - t_eff = tau*(1/p + g) + w
-    - harvests_per_hour_batch = N / t_eff
-    - profit_per_hour_batch = harvests_per_hour_batch*(v_boost - per_harvest_cost) - (B/H)
-    - profit_per_cycle_batch = profit_per_hour_batch * tau
     """
     p = _safe_float(inputs.get("p"), "p")
     tau = _safe_float(inputs.get("tau"), "tau")
@@ -65,10 +57,6 @@ def compute_profit_rates(inputs: Dict[str, Any]) -> Dict[str, Any]:
     g = _safe_int(inputs.get("g"), "g")
     v = _safe_float(inputs.get("v"), "v")
     per_harvest_cost = _safe_float(inputs.get("per_harvest_cost", 0.0), "per_harvest_cost")
-    H = _safe_float(inputs.get("H", 0.0), "H")
-    B = _safe_float(inputs.get("B", 0.0), "B")
-    v_boost_raw = inputs.get("v_boost", None)
-    v_boost = _safe_float(v_boost_raw if v_boost_raw is not None else v, "v_boost")
 
     if p <= 0.0 or p > 1.0:
         raise ValueError("p must be in (0, 1]")
@@ -80,8 +68,6 @@ def compute_profit_rates(inputs: Dict[str, Any]) -> Dict[str, Any]:
         raise ValueError("x must be > 0")
     if g < 0:
         raise ValueError("g must be >= 0")
-    if H < 0.0:
-        raise ValueError("H must be >= 0")
 
     warnings: List[str] = []
     inv_p = 1.0 / p
@@ -93,7 +79,6 @@ def compute_profit_rates(inputs: Dict[str, Any]) -> Dict[str, Any]:
     hours_per_harvest_per_spot = tau * cycles_per_harvest_per_spot
 
     v_net = v - per_harvest_cost
-    v_boost_net = v_boost - per_harvest_cost
 
     harvests_per_hour = N / hours_per_harvest_per_spot
     harvests_per_cycle = N / cycles_per_harvest_per_spot
@@ -108,37 +93,6 @@ def compute_profit_rates(inputs: Dict[str, Any]) -> Dict[str, Any]:
     profit_per_hour = _ensure_finite(profit_per_hour, "profit_per_hour")
     profit_per_cycle = _ensure_finite(profit_per_cycle, "profit_per_cycle")
 
-    if H > 0.0:
-        w = H / 2.0
-        teff = hours_per_harvest_per_spot + w
-        harvests_per_hour_batch = N / teff
-        harvests_per_cycle_batch = harvests_per_hour_batch * tau
-        boost_cost_hr = B / H
-        profit_per_hour_batch = (harvests_per_hour_batch * v_boost_net) - boost_cost_hr
-        profit_per_cycle_batch = profit_per_hour_batch * tau
-
-        batch: Dict[str, Any] = {
-            "H": _ensure_finite(H, "H"),
-            "w": _ensure_finite(w, "w"),
-            "teff_hours": _ensure_finite(teff, "teff_hours"),
-            "harvests_per_hour_batch": _ensure_finite(harvests_per_hour_batch, "harvests_per_hour_batch"),
-            "harvests_per_cycle_batch": _ensure_finite(harvests_per_cycle_batch, "harvests_per_cycle_batch"),
-            "boost_cost_hr": _ensure_finite(boost_cost_hr, "boost_cost_hr"),
-            "profit_per_hour_batch": _ensure_finite(profit_per_hour_batch, "profit_per_hour_batch"),
-            "profit_per_cycle_batch": _ensure_finite(profit_per_cycle_batch, "profit_per_cycle_batch"),
-        }
-    else:
-        batch = {
-            "H": None,
-            "w": None,
-            "teff_hours": None,
-            "harvests_per_hour_batch": None,
-            "harvests_per_cycle_batch": None,
-            "boost_cost_hr": None,
-            "profit_per_hour_batch": None,
-            "profit_per_cycle_batch": None,
-        }
-
     return {
         "tau_hours": _ensure_finite(tau, "tau_hours"),
         "p": _ensure_finite(p, "p"),
@@ -151,6 +105,5 @@ def compute_profit_rates(inputs: Dict[str, Any]) -> Dict[str, Any]:
         "profit_per_cycle": profit_per_cycle,
         "profit_per_hour": profit_per_hour,
         "v_net": _ensure_finite(v_net, "v_net"),
-        "batch": batch,
         "warnings": warnings,
     }
