@@ -98,8 +98,8 @@ export default function Home() {
   const [fortune, setFortune] = useState(2500);
   const [harvestMode, setHarvestMode] = useState<HarvestMode>("afk");
   const [afkInputMode, setAfkInputMode] = useState<AfkInputMode>("stages");
-  const [afkStages, setAfkStages] = useState(16);
-  const [afkHours, setAfkHours] = useState(24);
+  const [afkStages, setAfkStages] = useState(0);
+  const [afkHours, setAfkHours] = useState(0);
   const [fortuneAfk, setFortuneAfk] = useState(2500);
   const [fortuneAsap, setFortuneAsap] = useState(2500);
   const [useSameFortune, setUseSameFortune] = useState(true);
@@ -265,10 +265,6 @@ export default function Home() {
     });
   }, [mode, data, activeSmartTab]);
 
-  const afkStagesDerived = afkInputMode === "stages"
-    ? Math.max(0, Math.floor(afkStages))
-    : deriveHarvestStagesFromHours(afkHours, data?.metadata.cycle_time_hours ?? 0);
-
   const mutationProfitByName = useMemo(() => {
     const cycleTime = data?.metadata.cycle_time_hours ?? 0;
     const map: Record<string, {
@@ -285,6 +281,10 @@ export default function Home() {
       const chance = item.hourly?.mutation_chance ?? 0.25;
       const slotsPerPlot = Math.max(0, item.breakdown.base_limit);
       const setupCost = Math.max(0, item.opt_cost + extraSetupCost);
+      const afkStagesDerived = afkInputMode === "stages"
+        ? Math.max(0, Math.floor(afkStages))
+        : deriveHarvestStagesFromHours(afkHours, cycleTime);
+      const afkStagesForItem = afkStagesDerived > 0 ? afkStagesDerived : item.breakdown.growth_stages;
       const mutationYield = item.breakdown.yields.find((y) => y.name === item.mutationName)?.amount ?? 0;
       const modeFortune = harvestMode === "asap" ? fortuneAsap : fortuneAfk;
       const itemPrice = deriveCoinsPerMutationFromBatch({
@@ -324,7 +324,7 @@ export default function Home() {
           slotsPerPlot,
           mutationChance: chance,
           stageDurationHours: cycleTime,
-          harvestStages: afkStagesDerived,
+          harvestStages: afkStagesForItem,
           fortune: 0,
           baseItems,
           itemPrice,
@@ -338,7 +338,7 @@ export default function Home() {
           net: afk.netProfitByHarvest,
           profitHr: afk.netProfitPerHour,
           harvestHours: afk.harvestTimeHours,
-          stages: afkStagesDerived,
+          stages: afkStagesForItem,
         };
       }
     }
@@ -354,7 +354,9 @@ export default function Home() {
     buffCostAsapPerHour,
     extraSetupCost,
     asapSetupAmortizeHours,
-    afkStagesDerived,
+    afkInputMode,
+    afkStages,
+    afkHours,
     fortune,
   ]);
 
@@ -369,7 +371,10 @@ export default function Home() {
 
   const sortValue = (item: LeaderboardItem, key: SortKey) => {
     if (key === "mutation") return item.mutationName.toLowerCase();
-    if (key === "cycles") return item.breakdown.growth_stages;
+    if (key === "cycles") {
+      if (mode === "profit") return mutationProfitByName[item.mutationName]?.stages ?? item.breakdown.growth_stages;
+      return item.breakdown.growth_stages;
+    }
     if (key === "setup") return item.opt_cost;
     if (key === "profitCycle") return item.profit_per_cycle ?? 0;
     if (key === "profitHour") {
@@ -599,13 +604,18 @@ export default function Home() {
                       </button>
                     </div>
                     {afkInputMode === "stages" ? (
-                      <input
-                        type="number"
-                        min="0"
-                        value={afkStages}
-                        onChange={(e) => setAfkStages(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
-                        className="w-full bg-white dark:bg-neutral-800 border border-blue-200 dark:border-blue-900/40 rounded-lg px-3 py-1.5 text-sm"
-                      />
+                      <>
+                        <input
+                          type="number"
+                          min="0"
+                          value={afkStages}
+                          onChange={(e) => setAfkStages(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+                          className="w-full bg-white dark:bg-neutral-800 border border-blue-200 dark:border-blue-900/40 rounded-lg px-3 py-1.5 text-sm"
+                        />
+                        <p className="text-[11px] text-blue-800/80 dark:text-blue-200/80">
+                          Set to 0 to use each mutation&apos;s default growth cycles.
+                        </p>
+                      </>
                     ) : (
                       <>
                         <input
@@ -616,7 +626,7 @@ export default function Home() {
                           className="w-full bg-white dark:bg-neutral-800 border border-blue-200 dark:border-blue-900/40 rounded-lg px-3 py-1.5 text-sm"
                         />
                         <p className="text-[11px] text-blue-800/80 dark:text-blue-200/80">
-                          Derived stages: {afkStagesDerived}
+                          Derived stages are computed from hours and cycle time (0 hours uses each mutation default).
                         </p>
                       </>
                     )}
@@ -964,10 +974,14 @@ export default function Home() {
                           </td>
                         )}
                         <td className="px-6 py-4 text-right font-mono text-neutral-500 hidden md:table-cell">
-                          {item.breakdown.growth_stages} Cycles
+                          {mode === "profit"
+                            ? `${mutationProfitByName[item.mutationName]?.stages ?? item.breakdown.growth_stages} Cycles`
+                            : `${item.breakdown.growth_stages} Cycles`}
                         </td>
                         <td className="px-6 py-4 text-right font-mono text-neutral-500 hidden lg:table-cell">
-                          {formatDuration(item.breakdown.estimated_time_hours)}
+                          {mode === "profit"
+                            ? formatDuration(mutationProfitByName[item.mutationName]?.harvestHours ?? item.breakdown.estimated_time_hours)
+                            : formatDuration(item.breakdown.estimated_time_hours)}
                         </td>
                         <td className="px-6 py-4 text-right font-mono opacity-[0.65] hidden sm:table-cell">
                           {formatCoins(item.opt_cost)}
