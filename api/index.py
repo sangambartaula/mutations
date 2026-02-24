@@ -4,7 +4,9 @@ import math
 import os
 import json
 from fastapi import FastAPI, Query
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+
+from mut_calc import compute_profit_rates
 
 try:
     from api.shared_data import NPC_PRICES, get_bazaar_prices, csv_data, DEFAULT_REQS
@@ -64,6 +66,9 @@ def get_leaderboard(
     infini_vacuum: bool = Query(False),
     dark_cacao: bool = Query(False),
     hypercharge_level: int = Query(0, ge=0, le=20),
+    batch_interval_hours: float = Query(0.0, ge=0.0),
+    boost_cost: float = Query(0.0, ge=0.0),
+    boosted_mut_price: Optional[float] = Query(None),
 ) -> Dict[str, Any]:
     # Normalize FastAPI Query defaults when function is called directly in tests/scripts.
     if not isinstance(maxed_crops, str):
@@ -76,6 +81,12 @@ def get_leaderboard(
         custom_time_hours = 24.0
     if not isinstance(hypercharge_level, int):
         hypercharge_level = 0
+    if not isinstance(batch_interval_hours, (int, float)):
+        batch_interval_hours = 0.0
+    if not isinstance(boost_cost, (int, float)):
+        boost_cost = 0.0
+    if boosted_mut_price is not None and not isinstance(boosted_mut_price, (int, float)):
+        boosted_mut_price = None
     
     # Load Data
     bazaar_data = get_bazaar_prices()
@@ -263,6 +274,43 @@ def get_leaderboard(
         profit_per_cycle = (profit_batch / growth_stages) if growth_stages > 0 else 0.0
         profit_per_hour = (profit_batch / estimated_time) if estimated_time > 0 else 0.0
 
+        # Growth-stage mapping assumption:
+        # spawn rolls happen every cycle; once a mutation spawns, it needs k extra cycles to mature.
+        # Our data stores total growth_stages for maturity, so k = max(0, growth_stages - 1).
+        k_after_spawn = max(0, growth_stages - 1)
+        per_mut_boost_price = float(boosted_mut_price) if boosted_mut_price is not None else mut_sell_price_value
+        try:
+            profit_models = compute_profit_rates({
+                "m": plots,
+                "x": int(base_limit),
+                "p": mutation_chance_effective,
+                "tau": cycle_time_hours,
+                "k": k_after_spawn,
+                "v": mut_sell_price_value,
+                "v_boost": per_mut_boost_price,
+                "B": boost_cost,
+                "H": batch_interval_hours,
+            })
+        except ValueError as exc:
+            # Keep API resilient per mutation and surface validation context in warnings.
+            profit_models = {
+                "N": None,
+                "t0": None,
+                "rate_ready": None,
+                "revenue_hr_ready": None,
+                "profit_hr_ready": None,
+                "batch": {
+                    "H": None,
+                    "w": None,
+                    "teff": None,
+                    "rate_batch": None,
+                    "revenue_hr_batch": None,
+                    "boost_cost_hr": None,
+                    "profit_hr_batch": None,
+                },
+                "warnings": [f"profit model error: {exc}"],
+            }
+
         # Deterministic expected-value model for mutation-spawn profitability over time.
         if harvest_mode == "custom_time":
             harvest_time_hours = custom_time_hours
@@ -331,6 +379,7 @@ def get_leaderboard(
                 "expected_profit": expected_profit,
                 "expected_profit_per_hour": expected_profit_per_hour
             },
+            "profit_models": profit_models,
             "breakdown": breakdown
         })
 

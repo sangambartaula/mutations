@@ -91,7 +91,11 @@ const cropLabelMap: Record<string, string> = {
 };
 
 const toCropLabel = (crop: string) => cropLabelMap[crop] ?? crop;
-const toMutationLabel = (mutation: string) => (mutation === "TURTLELLINI" ? "Turtlellini" : mutation);
+const toMutationLabel = (mutation: string) => {
+  if (mutation === "TURTLELLINI") return "Turtlellini";
+  if (mutation === "Plant Boy Advance") return "PlantBoy Advance";
+  return mutation;
+};
 const toMutationIconPath = (mutationName: string) =>
   `/icons/mutations/${mutationName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}.png`;
 
