@@ -147,7 +147,6 @@ export default function Home() {
     { key: "Mushroom", label: "Mushroom" },
   ];
   const tableScrollRef = useRef<HTMLDivElement | null>(null);
-  const lastLeaderboardQueryRef = useRef<string | null>(null);
   const activeLeaderboardRequestRef = useRef(0);
 
   const [data, setData] = useState<LeaderboardResponse | null>(null);
@@ -232,32 +231,33 @@ export default function Home() {
   ]);
 
   useEffect(() => {
-    let cancelled = false;
     const controller = new AbortController();
-    const debounceHandle = window.setTimeout(async () => {
-      const query = new URLSearchParams({
-        plots: plots.toString(),
-        fortune: fortune.toString(),
-        improved_harvest_boost: useImprovedHarvestBoost ? "true" : "false",
-        harvest_harbinger: useHarvestHarbinger ? "true" : "false",
-        infini_vacuum: useInfiniVacuum ? "true" : "false",
-        dark_cacao: useDarkCacao ? "true" : "false",
-        hypercharge_level: hyperchargeLevel.toString(),
-        gh_upgrade: ghUpgrade.toString(),
-        unique_crops: uniqueCrops.toString(),
-        mode: mode,
-        setup_mode: setupMode,
-        sell_mode: sellMode,
-        maxed_crops: maxedCropsQuery,
-        ...(mode === "target" && { target_crop: targetCrop })
-      });
-      const queryString = query.toString();
-      if (lastLeaderboardQueryRef.current === queryString) return;
-      const requestId = activeLeaderboardRequestRef.current + 1;
-      activeLeaderboardRequestRef.current = requestId;
+    const requestId = activeLeaderboardRequestRef.current + 1;
+    activeLeaderboardRequestRef.current = requestId;
+    const timeoutHandle = window.setTimeout(() => controller.abort(), 15000);
 
-      setLoading(true);
-      setError("");
+    const query = new URLSearchParams({
+      plots: plots.toString(),
+      fortune: fortune.toString(),
+      improved_harvest_boost: useImprovedHarvestBoost ? "true" : "false",
+      harvest_harbinger: useHarvestHarbinger ? "true" : "false",
+      infini_vacuum: useInfiniVacuum ? "true" : "false",
+      dark_cacao: useDarkCacao ? "true" : "false",
+      hypercharge_level: hyperchargeLevel.toString(),
+      gh_upgrade: ghUpgrade.toString(),
+      unique_crops: uniqueCrops.toString(),
+      mode: mode,
+      setup_mode: setupMode,
+      sell_mode: sellMode,
+      maxed_crops: maxedCropsQuery,
+      ...(mode === "target" && { target_crop: targetCrop })
+    });
+    const queryString = query.toString();
+
+    setLoading(true);
+    setError("");
+
+    (async () => {
       try {
         const res = await fetch(`/api/leaderboard?${queryString}&t=${Date.now()}`, {
           cache: "no-store",
@@ -265,24 +265,26 @@ export default function Home() {
         });
         if (!res.ok) throw new Error("Failed to fetch leaderboard data.");
         const json: LeaderboardResponse = await res.json();
-        if (cancelled) return;
+        if (requestId !== activeLeaderboardRequestRef.current) return;
         setData(json);
-        lastLeaderboardQueryRef.current = queryString;
       } catch (err: unknown) {
-        if ((err as Error)?.name === "AbortError") return;
-        if (cancelled) return;
+        if (requestId !== activeLeaderboardRequestRef.current) return;
+        if ((err as Error)?.name === "AbortError") {
+          setError("Leaderboard request timed out. Check backend connectivity.");
+          return;
+        }
         setError(err instanceof Error ? err.message : "Unexpected error while fetching leaderboard data.");
       } finally {
+        window.clearTimeout(timeoutHandle);
         if (requestId === activeLeaderboardRequestRef.current) {
           setLoading(false);
         }
       }
-    }, 120);
+    })();
 
     return () => {
-      cancelled = true;
       controller.abort();
-      window.clearTimeout(debounceHandle);
+      window.clearTimeout(timeoutHandle);
     };
   }, [
     plots,
@@ -768,10 +770,14 @@ export default function Home() {
                 <div className="p-8 text-center text-red-500 bg-red-50 dark:bg-red-950/20 m-4 rounded-xl">
                   {error}
                 </div>
-              ) : !data ? (
+              ) : loading && !data ? (
                 <div className="p-12 text-center text-neutral-500 flex flex-col items-center gap-3">
                   <Loader2 className="w-8 h-8 animate-spin text-neutral-300 dark:text-neutral-700" />
                   <p>Calculating leaderboard data...</p>
+                </div>
+              ) : !data ? (
+                <div className="p-8 text-center text-neutral-500">
+                  No leaderboard data yet. Try refreshing.
                 </div>
               ) : (
                 mode === "smart" && missingCrops.length === 0 ? (
