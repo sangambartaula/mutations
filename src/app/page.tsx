@@ -8,7 +8,7 @@ import Image from "next/image";
 type OptimizationMode = "profit" | "smart" | "target";
 type SetupMode = "buy_order" | "insta_buy";
 type SellMode = "sell_offer" | "insta_sell";
-type SortKey = "rank" | "mutation" | "value" | "cycles" | "setup";
+type SortKey = "rank" | "mutation" | "value" | "cycle_profit" | "cycles" | "setup";
 type SortDirection = "asc" | "desc";
 
 type YieldMath = {
@@ -393,6 +393,7 @@ export default function Home() {
 
   const sortValue = (item: LeaderboardItem, key: SortKey) => {
     if (key === "mutation") return item.mutationName.toLowerCase();
+    if (key === "cycle_profit") return mode === "profit" ? item.profit_per_cycle : item.score;
     if (key === "cycles") return item.hourly?.g ?? item.breakdown.growth_stages;
     if (key === "setup") return item.opt_cost;
     if (key === "value") {
@@ -814,13 +815,21 @@ export default function Home() {
                       {mode === "profit" && (
                         <th className="px-6 py-4 font-semibold text-right text-sky-600 dark:text-sky-400 hidden lg:table-cell">
                           <div className="inline-flex items-center justify-end gap-2">
-                            <span>Profit / Cycle (long-run average)</span>
-                            <span
-                              title={profitPerCycleTooltip}
-                              className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-sky-500/50 text-[10px] leading-none cursor-help"
-                            >
-                              i
-                            </span>
+                            <button type="button" onClick={() => toggleSort("cycle_profit")} className="inline-flex items-center gap-1">
+                              Profit / Cycle (long-run average) <span aria-hidden="true">{sortIndicator("cycle_profit")}</span>
+                            </button>
+                            <div className="group relative">
+                              <span
+                                tabIndex={0}
+                                aria-label="Profit per cycle info"
+                                className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-sky-500/50 text-[10px] leading-none cursor-help"
+                              >
+                                i
+                              </span>
+                              <div className="pointer-events-none absolute right-0 bottom-full mb-2 w-72 rounded bg-neutral-900 px-2 py-2 text-left text-[11px] font-normal normal-case tracking-normal text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 z-10">
+                                {profitPerCycleTooltip}
+                              </div>
+                            </div>
                           </div>
                         </th>
                       )}
