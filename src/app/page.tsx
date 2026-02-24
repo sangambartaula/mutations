@@ -147,50 +147,61 @@ export default function Home() {
     { key: "Mushroom", label: "Mushroom" },
   ];
   const tableScrollRef = useRef<HTMLDivElement | null>(null);
+  const lastLeaderboardQueryRef = useRef<string | null>(null);
 
   const [data, setData] = useState<LeaderboardResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [settingsHydrated, setSettingsHydrated] = useState(false);
+  const [cropsHydrated, setCropsHydrated] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem("mutations:maxed-crops");
-    if (!saved) return;
     try {
-      const parsed: unknown = JSON.parse(saved);
-      if (Array.isArray(parsed)) {
-        setMaxedCrops(parsed.filter((v): v is string => typeof v === "string"));
+      if (saved) {
+        const parsed: unknown = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setMaxedCrops(parsed.filter((v): v is string => typeof v === "string"));
+        }
       }
     } catch {
       // Ignore malformed local storage data.
+    } finally {
+      setCropsHydrated(true);
     }
   }, []);
 
   useEffect(() => {
+    if (!cropsHydrated) return;
     localStorage.setItem("mutations:maxed-crops", JSON.stringify(maxedCrops));
-  }, [maxedCrops]);
+  }, [maxedCrops, cropsHydrated]);
 
   useEffect(() => {
     const saved = localStorage.getItem("mutations:settings");
-    if (!saved) return;
     try {
-      const parsed = JSON.parse(saved) as Record<string, unknown>;
-      if (typeof parsed.plots === "number") setPlots(Math.max(1, Math.min(3, parsed.plots)));
-      if (typeof parsed.fortune === "number") setFortune(Math.max(0, Math.min(4000, parsed.fortune)));
-      if (typeof parsed.useImprovedHarvestBoost === "boolean") setUseImprovedHarvestBoost(parsed.useImprovedHarvestBoost);
-      if (typeof parsed.useHarvestHarbinger === "boolean") setUseHarvestHarbinger(parsed.useHarvestHarbinger);
-      if (typeof parsed.useInfiniVacuum === "boolean") setUseInfiniVacuum(parsed.useInfiniVacuum);
-      if (typeof parsed.useDarkCacao === "boolean") setUseDarkCacao(parsed.useDarkCacao);
-      if (typeof parsed.hyperchargeLevel === "number") setHyperchargeLevel(Math.max(0, Math.min(20, parsed.hyperchargeLevel)));
-      if (typeof parsed.ghUpgrade === "number") setGhUpgrade(Math.max(0, Math.min(9, parsed.ghUpgrade)));
-      if (typeof parsed.uniqueCrops === "number") setUniqueCrops(Math.max(0, Math.min(12, parsed.uniqueCrops)));
-      if (parsed.setupMode === "buy_order" || parsed.setupMode === "insta_buy") setSetupMode(parsed.setupMode);
-      if (parsed.sellMode === "sell_offer" || parsed.sellMode === "insta_sell") setSellMode(parsed.sellMode);
+      if (saved) {
+        const parsed = JSON.parse(saved) as Record<string, unknown>;
+        if (typeof parsed.plots === "number") setPlots(Math.max(1, Math.min(3, parsed.plots)));
+        if (typeof parsed.fortune === "number") setFortune(Math.max(0, Math.min(4000, parsed.fortune)));
+        if (typeof parsed.useImprovedHarvestBoost === "boolean") setUseImprovedHarvestBoost(parsed.useImprovedHarvestBoost);
+        if (typeof parsed.useHarvestHarbinger === "boolean") setUseHarvestHarbinger(parsed.useHarvestHarbinger);
+        if (typeof parsed.useInfiniVacuum === "boolean") setUseInfiniVacuum(parsed.useInfiniVacuum);
+        if (typeof parsed.useDarkCacao === "boolean") setUseDarkCacao(parsed.useDarkCacao);
+        if (typeof parsed.hyperchargeLevel === "number") setHyperchargeLevel(Math.max(0, Math.min(20, parsed.hyperchargeLevel)));
+        if (typeof parsed.ghUpgrade === "number") setGhUpgrade(Math.max(0, Math.min(9, parsed.ghUpgrade)));
+        if (typeof parsed.uniqueCrops === "number") setUniqueCrops(Math.max(0, Math.min(12, parsed.uniqueCrops)));
+        if (parsed.setupMode === "buy_order" || parsed.setupMode === "insta_buy") setSetupMode(parsed.setupMode);
+        if (parsed.sellMode === "sell_offer" || parsed.sellMode === "insta_sell") setSellMode(parsed.sellMode);
+      }
     } catch {
       // Ignore malformed local storage data.
+    } finally {
+      setSettingsHydrated(true);
     }
   }, []);
 
   useEffect(() => {
+    if (!settingsHydrated) return;
     localStorage.setItem("mutations:settings", JSON.stringify({
       plots,
       fortune,
@@ -205,6 +216,7 @@ export default function Home() {
       sellMode,
     }));
   }, [
+    settingsHydrated,
     plots,
     fortune,
     useImprovedHarvestBoost,
@@ -219,28 +231,33 @@ export default function Home() {
   ]);
 
   useEffect(() => {
+    if (!settingsHydrated || !cropsHydrated) return;
+
     async function fetchData() {
+      const query = new URLSearchParams({
+        plots: plots.toString(),
+        fortune: fortune.toString(),
+        improved_harvest_boost: useImprovedHarvestBoost ? "true" : "false",
+        harvest_harbinger: useHarvestHarbinger ? "true" : "false",
+        infini_vacuum: useInfiniVacuum ? "true" : "false",
+        dark_cacao: useDarkCacao ? "true" : "false",
+        hypercharge_level: hyperchargeLevel.toString(),
+        gh_upgrade: ghUpgrade.toString(),
+        unique_crops: uniqueCrops.toString(),
+        mode: mode,
+        setup_mode: setupMode,
+        sell_mode: sellMode,
+        maxed_crops: maxedCrops.join(","),
+        ...(mode === "target" && { target_crop: targetCrop })
+      });
+      const queryString = query.toString();
+      if (lastLeaderboardQueryRef.current === queryString) return;
+      lastLeaderboardQueryRef.current = queryString;
+
       setLoading(true);
       setError("");
       try {
-        const query = new URLSearchParams({
-          plots: plots.toString(),
-          fortune: fortune.toString(),
-          improved_harvest_boost: useImprovedHarvestBoost ? "true" : "false",
-          harvest_harbinger: useHarvestHarbinger ? "true" : "false",
-          infini_vacuum: useInfiniVacuum ? "true" : "false",
-          dark_cacao: useDarkCacao ? "true" : "false",
-          hypercharge_level: hyperchargeLevel.toString(),
-          gh_upgrade: ghUpgrade.toString(),
-          unique_crops: uniqueCrops.toString(),
-          mode: mode,
-          setup_mode: setupMode,
-          sell_mode: sellMode,
-          maxed_crops: maxedCrops.join(","),
-          t: Date.now().toString(),
-          ...(mode === "target" && { target_crop: targetCrop })
-        });
-        const res = await fetch(`/api/leaderboard?${query.toString()}`, { cache: "no-store" });
+        const res = await fetch(`/api/leaderboard?${queryString}&t=${Date.now()}`, { cache: "no-store" });
         if (!res.ok) throw new Error("Failed to fetch leaderboard data.");
         const json: LeaderboardResponse = await res.json();
         setData(json);
@@ -266,6 +283,8 @@ export default function Home() {
     sellMode,
     targetCrop,
     maxedCrops,
+    settingsHydrated,
+    cropsHydrated,
   ]);
 
   const toggleMaxedCrop = (crop: string) => {
