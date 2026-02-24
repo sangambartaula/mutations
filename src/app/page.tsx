@@ -10,6 +10,7 @@ type SetupMode = "buy_order" | "insta_buy";
 type SellMode = "sell_offer" | "insta_sell";
 type SortKey = "rank" | "mutation" | "value" | "profitCycle" | "cycles" | "setup";
 type SortDirection = "asc" | "desc";
+type HarvestStrategy = "ready" | "batch";
 
 type YieldMath = {
   base: number;
@@ -58,6 +59,16 @@ type LeaderboardItem = {
   mut_price: number;
   limit: number;
   smart_progress?: Record<string, number>;
+  hourly?: {
+    profit_per_cycle?: number | null;
+    profit_per_hour_selected?: number | null;
+    g?: number | null;
+    warnings?: string[];
+    batch?: {
+      profit_per_cycle_batch?: number | null;
+      profit_per_hour_batch?: number | null;
+    };
+  };
   breakdown: MutationBreakdown;
 };
 
@@ -106,6 +117,10 @@ export default function Home() {
   const [useInfiniVacuum, setUseInfiniVacuum] = useState(false);
   const [useDarkCacao, setUseDarkCacao] = useState(false);
   const [hyperchargeLevel, setHyperchargeLevel] = useState(0);
+  const [harvestStrategy, setHarvestStrategy] = useState<HarvestStrategy>("ready");
+  const [batchHours, setBatchHours] = useState(0);
+  const [boostCost, setBoostCost] = useState(0);
+  const [boostedValueOverride, setBoostedValueOverride] = useState<string>("");
   const [ghUpgrade, setGhUpgrade] = useState(9);
   const [uniqueCrops, setUniqueCrops] = useState(12);
 
@@ -173,15 +188,20 @@ export default function Home() {
           infini_vacuum: useInfiniVacuum ? "true" : "false",
           dark_cacao: useDarkCacao ? "true" : "false",
           hypercharge_level: hyperchargeLevel.toString(),
+          harvest_strategy: harvestStrategy,
+          batch_hours: batchHours.toString(),
+          boost_cost: boostCost.toString(),
+          ...(boostedValueOverride.trim() !== "" ? { boosted_value_override: boostedValueOverride.trim() } : {}),
           gh_upgrade: ghUpgrade.toString(),
           unique_crops: uniqueCrops.toString(),
           mode: mode,
           setup_mode: setupMode,
           sell_mode: sellMode,
           maxed_crops: maxedCrops.join(","),
+          t: Date.now().toString(),
           ...(mode === "target" && { target_crop: targetCrop })
         });
-        const res = await fetch(`/api/leaderboard?${query.toString()}`);
+        const res = await fetch(`/api/leaderboard?${query.toString()}`, { cache: "no-store" });
         if (!res.ok) throw new Error("Failed to fetch leaderboard data.");
         const json: LeaderboardResponse = await res.json();
         setData(json);
@@ -199,6 +219,10 @@ export default function Home() {
     useInfiniVacuum,
     useDarkCacao,
     hyperchargeLevel,
+    harvestStrategy,
+    batchHours,
+    boostCost,
+    boostedValueOverride,
     ghUpgrade,
     uniqueCrops,
     mode,
@@ -228,6 +252,28 @@ export default function Home() {
     if (hrs === 0) return `${mins}m`;
     if (mins === 0) return `${hrs}h`;
     return `${hrs}h ${mins}m`;
+  };
+
+  const getRowProfitPerCycle = (item: LeaderboardItem) => {
+    if (harvestStrategy === "batch") {
+      return item.hourly?.batch?.profit_per_cycle_batch ?? item.hourly?.profit_per_cycle ?? item.profit_per_cycle ?? 0;
+    }
+    return item.hourly?.profit_per_cycle ?? item.profit_per_cycle ?? 0;
+  };
+
+  const getRowProfitPerHourSelected = (item: LeaderboardItem) => {
+    return item.hourly?.profit_per_hour_selected ?? item.profit_per_hour ?? 0;
+  };
+
+  const getGrowthCyclesLabel = (item: LeaderboardItem) => {
+    const g = item.hourly?.g;
+    if (typeof g === "number") {
+      if (g === 0) return "Instant";
+      return `${g} Cycles`;
+    }
+    const fallback = item.breakdown.growth_stages;
+    if (fallback === 0) return "Instant";
+    return `${fallback} Cycles`;
   };
 
   const formatYieldCalculation = (math: YieldMath, unitPrice: number) => {
@@ -287,9 +333,9 @@ export default function Home() {
 
   const sortValue = (item: LeaderboardItem, key: SortKey) => {
     if (key === "mutation") return item.mutationName.toLowerCase();
-    if (key === "cycles") return item.breakdown.growth_stages;
+    if (key === "cycles") return item.hourly?.g ?? item.breakdown.growth_stages;
     if (key === "setup") return item.opt_cost;
-    if (key === "profitCycle") return item.profit_per_cycle ?? 0;
+    if (key === "profitCycle") return getRowProfitPerCycle(item);
     if (key === "value") {
       if (mode === "smart") {
         if (activeSmartTab !== "all") return item.smart_progress?.[activeSmartTab] ?? 0;
@@ -516,6 +562,54 @@ export default function Home() {
                 />
                 <p className="text-[11px] text-neutral-500 mt-1">Hypercharge only scales affected buffs (Vacuum + Dark Cacao), up to +100% at level 20.</p>
               </div>
+            </div>
+
+            <div className="mb-6 rounded-xl border border-neutral-200 dark:border-neutral-800 p-3 space-y-3">
+              <p className="text-sm font-medium">Harvest Strategy</p>
+              <div className="flex bg-neutral-100 dark:bg-neutral-800 rounded-xl p-1">
+                <button
+                  onClick={() => setHarvestStrategy("ready")}
+                  className={`flex-1 text-xs py-1.5 rounded-lg transition-colors ${harvestStrategy === "ready" ? "bg-white dark:bg-neutral-700 shadow-sm font-medium" : "text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"}`}
+                >
+                  Harvest when ready
+                </button>
+                <button
+                  onClick={() => setHarvestStrategy("batch")}
+                  className={`flex-1 text-xs py-1.5 rounded-lg transition-colors ${harvestStrategy === "batch" ? "bg-white dark:bg-neutral-700 shadow-sm font-medium" : "text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"}`}
+                >
+                  Batch harvest
+                </button>
+              </div>
+
+              {harvestStrategy === "batch" && (
+                <div className="space-y-2">
+                  <label className="text-xs font-medium block">Batch Hours (H)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={batchHours}
+                    onChange={(e) => setBatchHours(Math.max(0, Number(e.target.value) || 0))}
+                    className="w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1 text-sm"
+                  />
+                  <label className="text-xs font-medium block">Boost Cost (B)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={boostCost}
+                    onChange={(e) => setBoostCost(Math.max(0, Number(e.target.value) || 0))}
+                    className="w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1 text-sm"
+                  />
+                  <label className="text-xs font-medium block">Boosted Value Override (optional)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={boostedValueOverride}
+                    onChange={(e) => setBoostedValueOverride(e.target.value)}
+                    placeholder="Leave blank to use base value"
+                    className="w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1 text-sm"
+                  />
+                </div>
+              )}
             </div>
 
             {/* Greenhouse Upgrade Slider */}
@@ -774,11 +868,14 @@ export default function Home() {
                             </div>
                           </td>
                         )}
-                        <td className="px-6 py-4 text-right font-mono hidden lg:table-cell text-emerald-600 dark:text-emerald-400">
-                          {formatCoins(item.profit_per_cycle)}
+                        <td
+                          className="px-6 py-4 text-right font-mono hidden lg:table-cell text-emerald-600 dark:text-emerald-400"
+                          title={`Profit/Hour (${harvestStrategy === "batch" ? "batch" : "ready"}): ${formatCoins(getRowProfitPerHourSelected(item))}`}
+                        >
+                          {formatCoins(getRowProfitPerCycle(item))}
                         </td>
                         <td className="px-6 py-4 text-right font-mono text-neutral-500 hidden md:table-cell">
-                          {item.breakdown.growth_stages} Cycles
+                          {getGrowthCyclesLabel(item)}
                         </td>
                         <td className="px-6 py-4 text-right font-mono text-neutral-500 hidden lg:table-cell">
                           {formatDuration(item.breakdown.estimated_time_hours)}
@@ -796,7 +893,7 @@ export default function Home() {
           </div>
 
           <div className="rounded-xl border border-amber-200/70 bg-amber-50/80 px-4 py-3 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
-            Profit/Cycle is calculated as Profit/Harvest divided by Growth Cycles. Results are based on community-tested assumptions; verify key values in-game before large orders.
+            Profit/Cycle and Profit/Hour use the expected-value global growth-cycle model from the API. Results are based on community-tested assumptions; verify key values in-game before large orders.
           </div>
         </main>
       </div>
@@ -883,7 +980,9 @@ export default function Home() {
                       <Clock className="w-4 h-4" />
                       Growth Cycles:
                     </div>
-                    <span className="bg-blue-600 text-white px-3 py-1 rounded-lg text-xs font-black">{selectedMutation.breakdown.growth_stages} Cycles</span>
+                    <span className="bg-blue-600 text-white px-3 py-1 rounded-lg text-xs font-black">
+                      {selectedMutation.hourly?.g === 0 ? "Instant" : `${selectedMutation.hourly?.g ?? selectedMutation.breakdown.growth_stages} Cycles`}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between pt-2 border-t border-blue-500/20">
                     <span className="text-xs font-medium text-blue-600 dark:text-blue-400">Estimated Lifecycle Time:</span>

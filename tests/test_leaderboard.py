@@ -51,7 +51,7 @@ class LeaderboardTests(unittest.TestCase):
         self.assertEqual(ingredient_amounts.get("Brown Mushroom"), 3)
 
     @patch("api.index.get_bazaar_prices", return_value={})
-    def test_growth_stages_are_clamped_to_minimum_one(self, _mock_prices):
+    def test_growth_stages_allow_zero_for_instant_mutations(self, _mock_prices):
         result = get_leaderboard(
             plots=3,
             fortune=2500,
@@ -66,7 +66,7 @@ class LeaderboardTests(unittest.TestCase):
 
         veil = next((m for m in result["leaderboard"] if m["mutationName"] == "Veilshroom"), None)
         self.assertIsNotNone(veil)
-        self.assertEqual(veil["breakdown"]["growth_stages"], 1)
+        self.assertEqual(veil["breakdown"]["growth_stages"], 0)
 
     @patch("api.index.get_bazaar_prices", return_value={})
     def test_profit_per_cycle_matches_profit_divided_by_growth_stages(self, _mock_prices):

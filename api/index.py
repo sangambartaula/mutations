@@ -195,7 +195,7 @@ def get_leaderboard(
         expected_drops_value = 0
         
         # Growth stage and special multiplier can be overridden per mutation in mutation_ingredient_list.json
-        growth_stages = max(1, int(m_data.get("growth_stages", DEFAULT_GROWTH_STAGE_BY_MUTATION.get(mut_name, 30))))
+        growth_stages = max(0, int(m_data.get("growth_stages", DEFAULT_GROWTH_STAGE_BY_MUTATION.get(mut_name, 30))))
         special_mult = float(m_data.get("special_multiplier", DEFAULT_SPECIAL_MULTIPLIER_BY_MUTATION.get(mut_name, 1.0)))
         effective_special_mult = float(m_data.get("effective_special_multiplier", special_mult))
         spawn_fill_fraction = 1.0
