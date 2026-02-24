@@ -91,6 +91,7 @@ const cropLabelMap: Record<string, string> = {
 };
 
 const toCropLabel = (crop: string) => cropLabelMap[crop] ?? crop;
+const toMutationLabel = (mutation: string) => (mutation === "TURTLELLINI" ? "Turtlellini" : mutation);
 const toMutationIconPath = (mutationName: string) =>
   `/icons/mutations/${mutationName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}.png`;
 
@@ -744,7 +745,7 @@ export default function Home() {
                             <Sprout className="w-4 h-4 text-emerald-500 icon-fallback-glyph hidden" />
                           </div>
                           <div>
-                            <span className="hover:text-amber-500 transition-colors">{item.mutationName}</span>
+                            <span className="hover:text-amber-500 transition-colors">{toMutationLabel(item.mutationName)}</span>
                             {idx === 0 && <span className="ml-2 text-[10px] uppercase tracking-wider font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 px-2 py-0.5 rounded-full inline-block mt-1">Top Pick</span>}
                           </div>
                         </td>
@@ -818,7 +819,7 @@ export default function Home() {
                   <Sprout className="w-6 h-6 text-emerald-600 dark:text-emerald-400 icon-fallback-glyph hidden" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold">{selectedMutation.mutationName} Breakdown</h3>
+                  <h3 className="text-xl font-bold">{toMutationLabel(selectedMutation.mutationName)} Breakdown</h3>
                   <p className="text-sm text-neutral-500">For {plots} Placed Plot{plots > 1 ? 's' : ''}</p>
                 </div>
               </div>
@@ -829,8 +830,8 @@ export default function Home() {
 
             <div className="p-6 space-y-6 overflow-y-auto custom-scrollbar">
               <div className="bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/30 rounded-xl p-4 text-sm text-emerald-800 dark:text-emerald-200">
-                You can plant <span className="font-bold">{selectedMutation.breakdown.base_limit}x {selectedMutation.mutationName}</span> in 1 Plot.
-                <br />With {plots} plot(s) total ({selectedMutation.limit}x {selectedMutation.mutationName}), {selectedMutation.breakdown.ingredients.length === 0 ? "this requires no ingredients!" : "this requires:"}
+                You can plant <span className="font-bold">{selectedMutation.breakdown.base_limit}x {toMutationLabel(selectedMutation.mutationName)}</span> in 1 Plot.
+                <br />With {plots} plot(s) total ({selectedMutation.limit}x {toMutationLabel(selectedMutation.mutationName)}), {selectedMutation.breakdown.ingredients.length === 0 ? "this requires no ingredients!" : "this requires:"}
               </div>
 
               {selectedMutation.breakdown.ingredients.length > 0 && (
