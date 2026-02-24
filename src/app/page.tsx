@@ -103,6 +103,8 @@ const toMutationLabel = (mutation: string) => {
 };
 const toMutationIconPath = (mutationName: string) =>
   `/icons/mutations/${mutationName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}.png`;
+const profitPerCycleTooltip =
+  "Expected profit per global growth tick. Actual harvests are random and can be bursty, especially for low spawn rates.";
 
 export default function Home() {
   const [plots, setPlots] = useState(3);
@@ -770,6 +772,19 @@ export default function Home() {
                           </button>
                         </th>
                       )}
+                      {mode === "profit" && (
+                        <th className="px-6 py-4 font-semibold text-right text-sky-600 dark:text-sky-400 hidden lg:table-cell">
+                          <div className="inline-flex items-center justify-end gap-2">
+                            <span>Profit / Cycle (long-run average)</span>
+                            <span
+                              title={profitPerCycleTooltip}
+                              className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-sky-500/50 text-[10px] leading-none cursor-help"
+                            >
+                              i
+                            </span>
+                          </div>
+                        </th>
+                      )}
                       <th className="px-6 py-4 font-semibold text-right hidden md:table-cell">
                         <button type="button" onClick={() => toggleSort("cycles")} className="inline-flex items-center gap-1">
                           Growth Cycles <span aria-hidden="true">{sortIndicator("cycles")}</span>
@@ -850,6 +865,11 @@ export default function Home() {
                               )}
                               {formatCoins(mode === "target" ? item.score : item.profit)}
                             </div>
+                          </td>
+                        )}
+                        {mode === "profit" && (
+                          <td className="px-6 py-4 text-right font-mono font-bold text-sky-600 dark:text-sky-400 hidden lg:table-cell">
+                            {formatCoins(item.profit_per_cycle)}
                           </td>
                         )}
                         <td className="px-6 py-4 text-right font-mono text-neutral-500 hidden md:table-cell">
