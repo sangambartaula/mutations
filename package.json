@@ -8,8 +8,7 @@
     "dev:backend": "python -m uvicorn api.index:app --port 8000",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
-    "test": "vitest run"
+    "lint": "eslint"
   },
   "dependencies": {
     "lucide-react": "^0.575.0",
@@ -26,7 +25,6 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
-    "typescript": "^5",
-    "vitest": "^4.0.18"
+    "typescript": "^5"
   }
 }

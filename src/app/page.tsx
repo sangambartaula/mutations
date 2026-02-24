@@ -2,22 +2,13 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { ModeToggle } from "@/components/mode-toggle";
-import { Coins, Sprout, Clock, Calculator, Loader2, ArrowUpRight, AlertTriangle, X } from "lucide-react";
-import {
-  computeProfitHrAFK,
-  computeProfitHrASAP,
-  deriveCoinsPerMutationFromBatch,
-  deriveHarvestStagesFromHours,
-} from "@/lib/mutation-profit-calculator";
-import { applyFortuneChange, syncFortunesOnToggle } from "@/lib/fortune-link";
+import { Coins, Sprout, Clock, Calculator, Loader2, ArrowUpRight, AlertTriangle, X, Info } from "lucide-react";
 
 type OptimizationMode = "profit" | "smart" | "target";
 type SetupMode = "buy_order" | "insta_buy";
 type SellMode = "sell_offer" | "insta_sell";
-type SortKey = "rank" | "mutation" | "value" | "profitCycle" | "profitHour" | "cycles" | "setup";
+type SortKey = "rank" | "mutation" | "value" | "profitCycle" | "cycles" | "setup";
 type SortDirection = "asc" | "desc";
-type HarvestMode = "afk" | "asap";
-type AfkInputMode = "stages" | "hours";
 
 type YieldMath = {
   base: number;
@@ -52,6 +43,8 @@ type MutationBreakdown = {
   total_revenue: number;
   growth_stages: number;
   estimated_time_hours: number;
+  expected_fill_cycles?: number;
+  expected_fill_time_hours?: number;
 };
 
 type LeaderboardItem = {
@@ -66,9 +59,6 @@ type LeaderboardItem = {
   mut_price: number;
   limit: number;
   smart_progress?: Record<string, number>;
-  hourly?: {
-    mutation_chance?: number;
-  };
   breakdown: MutationBreakdown;
 };
 
@@ -96,17 +86,6 @@ const toCropLabel = (crop: string) => cropLabelMap[crop] ?? crop;
 export default function Home() {
   const [plots, setPlots] = useState(3);
   const [fortune, setFortune] = useState(2500);
-  const [harvestMode, setHarvestMode] = useState<HarvestMode>("afk");
-  const [afkInputMode, setAfkInputMode] = useState<AfkInputMode>("stages");
-  const [afkStages, setAfkStages] = useState(0);
-  const [afkHours, setAfkHours] = useState(0);
-  const [fortuneAfk, setFortuneAfk] = useState(2500);
-  const [fortuneAsap, setFortuneAsap] = useState(2500);
-  const [useSameFortune, setUseSameFortune] = useState(true);
-  const [buffCostAfkPerHarvest, setBuffCostAfkPerHarvest] = useState(0);
-  const [buffCostAsapPerHour, setBuffCostAsapPerHour] = useState(0);
-  const [extraSetupCost, setExtraSetupCost] = useState(0);
-  const [asapSetupAmortizeHours, setAsapSetupAmortizeHours] = useState(24);
   const [ghUpgrade, setGhUpgrade] = useState(9);
   const [uniqueCrops, setUniqueCrops] = useState(12);
 
@@ -161,12 +140,6 @@ export default function Home() {
   useEffect(() => {
     localStorage.setItem("mutations:maxed-crops", JSON.stringify(maxedCrops));
   }, [maxedCrops]);
-
-  useEffect(() => {
-    const synced = syncFortunesOnToggle(useSameFortune, { fortuneAfk, fortuneAsap });
-    if (synced.fortuneAfk !== fortuneAfk) setFortuneAfk(synced.fortuneAfk);
-    if (synced.fortuneAsap !== fortuneAsap) setFortuneAsap(synced.fortuneAsap);
-  }, [useSameFortune, fortuneAfk, fortuneAsap]);
 
   useEffect(() => {
     async function fetchData() {
@@ -265,101 +238,6 @@ export default function Home() {
     });
   }, [mode, data, activeSmartTab]);
 
-  const mutationProfitByName = useMemo(() => {
-    const cycleTime = data?.metadata.cycle_time_hours ?? 0;
-    const map: Record<string, {
-      expectedMutations: number;
-      revenue: number;
-      costs: number;
-      net: number;
-      profitHr: number;
-      harvestHours: number;
-      stages: number;
-    }> = {};
-
-    for (const item of visibleLeaderboard) {
-      const chance = item.hourly?.mutation_chance ?? 0.25;
-      const slotsPerPlot = Math.max(0, item.breakdown.base_limit);
-      const setupCost = Math.max(0, item.opt_cost + extraSetupCost);
-      const afkStagesDerived = afkInputMode === "stages"
-        ? Math.max(0, Math.floor(afkStages))
-        : deriveHarvestStagesFromHours(afkHours, cycleTime);
-      const afkStagesForItem = afkStagesDerived > 0 ? afkStagesDerived : item.breakdown.growth_stages;
-      const mutationYield = item.breakdown.yields.find((y) => y.name === item.mutationName)?.amount ?? 0;
-      const modeFortune = harvestMode === "asap" ? fortuneAsap : fortuneAfk;
-      const itemPrice = deriveCoinsPerMutationFromBatch({
-        totalRevenueAtReferenceFortune: Math.max(0, item.revenue),
-        mutationUnitPrice: Math.max(0, item.mut_price),
-        mutationsAtHarvest: mutationYield,
-        referenceFortune: fortune,
-        modeFortune,
-      });
-      const baseItems = 1;
-
-      if (harvestMode === "asap") {
-        const asap = computeProfitHrASAP({
-          plots,
-          slotsPerPlot,
-          mutationChance: chance,
-          stageDurationHours: cycleTime,
-          fortune: 0,
-          baseItems,
-          itemPrice,
-          buffCostPerHour: buffCostAsapPerHour,
-          setupCost,
-          setupAmortizeHours: asapSetupAmortizeHours,
-        });
-        map[item.mutationName] = {
-          expectedMutations: asap.expectedMutationsPerStage,
-          revenue: asap.revenuePerHour,
-          costs: asap.costsPerHour,
-          net: asap.netProfitPerHour,
-          profitHr: asap.netProfitPerHour,
-          harvestHours: cycleTime,
-          stages: 1,
-        };
-      } else {
-        const afk = computeProfitHrAFK({
-          plots,
-          slotsPerPlot,
-          mutationChance: chance,
-          stageDurationHours: cycleTime,
-          harvestStages: afkStagesForItem,
-          fortune: 0,
-          baseItems,
-          itemPrice,
-          setupCost,
-          buffCostPerHarvest: buffCostAfkPerHarvest,
-        });
-        map[item.mutationName] = {
-          expectedMutations: afk.expectedMutationsByHarvest,
-          revenue: afk.revenueByHarvest,
-          costs: afk.costsByHarvest,
-          net: afk.netProfitByHarvest,
-          profitHr: afk.netProfitPerHour,
-          harvestHours: afk.harvestTimeHours,
-          stages: afkStagesForItem,
-        };
-      }
-    }
-    return map;
-  }, [
-    data?.metadata.cycle_time_hours,
-    visibleLeaderboard,
-    harvestMode,
-    plots,
-    fortuneAfk,
-    fortuneAsap,
-    buffCostAfkPerHarvest,
-    buffCostAsapPerHour,
-    extraSetupCost,
-    asapSetupAmortizeHours,
-    afkInputMode,
-    afkStages,
-    afkHours,
-    fortune,
-  ]);
-
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) {
       setSortDirection((prev) => (prev === "desc" ? "asc" : "desc"));
@@ -371,16 +249,9 @@ export default function Home() {
 
   const sortValue = (item: LeaderboardItem, key: SortKey) => {
     if (key === "mutation") return item.mutationName.toLowerCase();
-    if (key === "cycles") {
-      if (mode === "profit") return mutationProfitByName[item.mutationName]?.stages ?? item.breakdown.growth_stages;
-      return item.breakdown.growth_stages;
-    }
+    if (key === "cycles") return item.breakdown.expected_fill_cycles ?? item.breakdown.growth_stages;
     if (key === "setup") return item.opt_cost;
     if (key === "profitCycle") return item.profit_per_cycle ?? 0;
-    if (key === "profitHour") {
-      if (mode === "profit") return mutationProfitByName[item.mutationName]?.profitHr ?? 0;
-      return item.profit_per_hour ?? 0;
-    }
     if (key === "value") {
       if (mode === "smart") {
         if (activeSmartTab !== "all") return item.smart_progress?.[activeSmartTab] ?? 0;
@@ -412,8 +283,6 @@ export default function Home() {
     if (!tableScrollRef.current) return;
     tableScrollRef.current.scrollBy({ left: pixels, behavior: "smooth" });
   };
-
-  const selectedMutationModel = selectedMutation ? mutationProfitByName[selectedMutation.mutationName] : null;
 
 
 
@@ -557,162 +426,6 @@ export default function Home() {
                 className="w-full accent-emerald-500"
               />
             </div>
-
-            {mode === "profit" && (
-              <div className="mb-6 rounded-xl border border-blue-200 dark:border-blue-900/40 bg-blue-50/60 dark:bg-blue-950/20 p-4 space-y-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">Mutation Profit / Hour</p>
-                  <div className="flex rounded-lg border border-blue-300 dark:border-blue-700 overflow-hidden text-xs">
-                    <button
-                      type="button"
-                      onClick={() => setHarvestMode("afk")}
-                      className={`px-2 py-1 ${harvestMode === "afk" ? "bg-blue-600 text-white" : "bg-transparent text-blue-700 dark:text-blue-300"}`}
-                    >
-                      AFK
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setHarvestMode("asap")}
-                      className={`px-2 py-1 ${harvestMode === "asap" ? "bg-blue-600 text-white" : "bg-transparent text-blue-700 dark:text-blue-300"}`}
-                    >
-                      ASAP
-                    </button>
-                  </div>
-                </div>
-
-                <p className="text-[11px] text-blue-800/80 dark:text-blue-200/80">
-                  AFK uses setup cost once per harvest window. ASAP amortizes setup cost over the hours below.
-                </p>
-
-                {harvestMode === "afk" ? (
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium block">AFK Harvest Input</label>
-                    <div className="flex bg-white/70 dark:bg-neutral-900/50 rounded-lg p-1 border border-blue-200 dark:border-blue-900/40 text-xs">
-                      <button
-                        type="button"
-                        onClick={() => setAfkInputMode("stages")}
-                        className={`flex-1 rounded-md py-1 ${afkInputMode === "stages" ? "bg-blue-600 text-white" : "text-blue-700 dark:text-blue-300"}`}
-                      >
-                        After N Stages
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setAfkInputMode("hours")}
-                        className={`flex-1 rounded-md py-1 ${afkInputMode === "hours" ? "bg-blue-600 text-white" : "text-blue-700 dark:text-blue-300"}`}
-                      >
-                        After T Hours
-                      </button>
-                    </div>
-                    {afkInputMode === "stages" ? (
-                      <>
-                        <input
-                          type="number"
-                          min="0"
-                          value={afkStages}
-                          onChange={(e) => setAfkStages(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
-                          className="w-full bg-white dark:bg-neutral-800 border border-blue-200 dark:border-blue-900/40 rounded-lg px-3 py-1.5 text-sm"
-                        />
-                        <p className="text-[11px] text-blue-800/80 dark:text-blue-200/80">
-                          Set to 0 to use each mutation&apos;s default growth cycles.
-                        </p>
-                      </>
-                    ) : (
-                      <>
-                        <input
-                          type="number"
-                          min="0"
-                          value={afkHours}
-                          onChange={(e) => setAfkHours(Math.max(0, Number(e.target.value) || 0))}
-                          className="w-full bg-white dark:bg-neutral-800 border border-blue-200 dark:border-blue-900/40 rounded-lg px-3 py-1.5 text-sm"
-                        />
-                        <p className="text-[11px] text-blue-800/80 dark:text-blue-200/80">
-                          Derived stages are computed from hours and cycle time (0 hours uses each mutation default).
-                        </p>
-                      </>
-                    )}
-                  </div>
-                ) : null}
-
-                <div className="space-y-2">
-                  <label className="inline-flex items-center gap-2 text-xs font-medium">
-                    <input
-                      type="checkbox"
-                      checked={useSameFortune}
-                      onChange={(e) => setUseSameFortune(e.target.checked)}
-                      className="accent-blue-600"
-                    />
-                    Use same fortune for both
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      type="number"
-                      min="0"
-                      max="4000"
-                      value={fortuneAfk}
-                      onChange={(e) => {
-                        const next = applyFortuneChange("afk", Number(e.target.value), useSameFortune, { fortuneAfk, fortuneAsap });
-                        setFortuneAfk(next.fortuneAfk);
-                        setFortuneAsap(next.fortuneAsap);
-                      }}
-                      className="w-full bg-white dark:bg-neutral-800 border border-blue-200 dark:border-blue-900/40 rounded-lg px-3 py-1.5 text-sm"
-                      aria-label="Fortune AFK"
-                    />
-                    <input
-                      type="number"
-                      min="0"
-                      max="4000"
-                      value={fortuneAsap}
-                      onChange={(e) => {
-                        const next = applyFortuneChange("asap", Number(e.target.value), useSameFortune, { fortuneAfk, fortuneAsap });
-                        setFortuneAfk(next.fortuneAfk);
-                        setFortuneAsap(next.fortuneAsap);
-                      }}
-                      className="w-full bg-white dark:bg-neutral-800 border border-blue-200 dark:border-blue-900/40 rounded-lg px-3 py-1.5 text-sm"
-                      aria-label="Fortune ASAP"
-                      disabled={useSameFortune}
-                    />
-                  </div>
-                  <p className="text-[11px] text-blue-800/80 dark:text-blue-200/80">Left: Fortune (AFK), Right: Fortune (ASAP)</p>
-                </div>
-
-                <div className="grid grid-cols-1 gap-2">
-                  <label className="text-xs font-medium">Buff Cost (AFK, per harvest)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={buffCostAfkPerHarvest}
-                    onChange={(e) => setBuffCostAfkPerHarvest(Math.max(0, Number(e.target.value) || 0))}
-                    className="w-full bg-white dark:bg-neutral-800 border border-blue-200 dark:border-blue-900/40 rounded-lg px-3 py-1.5 text-sm"
-                  />
-
-                  <label className="text-xs font-medium">Buff Cost (ASAP, per hour)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={buffCostAsapPerHour}
-                    onChange={(e) => setBuffCostAsapPerHour(Math.max(0, Number(e.target.value) || 0))}
-                    className="w-full bg-white dark:bg-neutral-800 border border-blue-200 dark:border-blue-900/40 rounded-lg px-3 py-1.5 text-sm"
-                  />
-
-                  <label className="text-xs font-medium">Extra Setup Cost (coins)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={extraSetupCost}
-                    onChange={(e) => setExtraSetupCost(Math.max(0, Number(e.target.value) || 0))}
-                    className="w-full bg-white dark:bg-neutral-800 border border-blue-200 dark:border-blue-900/40 rounded-lg px-3 py-1.5 text-sm"
-                  />
-                  <label className="text-xs font-medium">ASAP Setup Amortize Hours</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={asapSetupAmortizeHours}
-                    onChange={(e) => setAsapSetupAmortizeHours(Math.max(0, Number(e.target.value) || 0))}
-                    className="w-full bg-white dark:bg-neutral-800 border border-blue-200 dark:border-blue-900/40 rounded-lg px-3 py-1.5 text-sm"
-                  />
-                </div>
-              </div>
-            )}
 
             {/* Greenhouse Upgrade Slider */}
             <div className="mb-6">
@@ -896,16 +609,15 @@ export default function Home() {
                           Profit / Cycle <span aria-hidden="true">{sortIndicator("profitCycle")}</span>
                         </button>
                       </th>
-                      {mode === "profit" && (
-                        <th className="px-6 py-4 font-semibold text-right hidden xl:table-cell text-emerald-600 dark:text-emerald-400">
-                          <button type="button" onClick={() => toggleSort("profitHour")} className="inline-flex items-center gap-1">
-                            Mutation Profit / Hour <span aria-hidden="true">{sortIndicator("profitHour")}</span>
-                          </button>
-                        </th>
-                      )}
                       <th className="px-6 py-4 font-semibold text-right hidden md:table-cell">
                         <button type="button" onClick={() => toggleSort("cycles")} className="inline-flex items-center gap-1">
                           Growth Cycles <span aria-hidden="true">{sortIndicator("cycles")}</span>
+                          <span className="group relative inline-flex ml-1">
+                            <Info className="w-3.5 h-3.5 text-neutral-400" />
+                            <span className="pointer-events-none absolute bottom-full right-0 mb-2 w-72 p-2 rounded bg-neutral-900 text-[11px] normal-case text-white opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                              Profit/Cycle assumes one harvest after all mutation slots are expected to fill (expected-value model).
+                            </span>
+                          </span>
                         </button>
                       </th>
                       <th className="px-6 py-4 font-semibold text-right hidden lg:table-cell">
@@ -968,20 +680,11 @@ export default function Home() {
                         <td className="px-6 py-4 text-right font-mono hidden lg:table-cell text-emerald-600 dark:text-emerald-400">
                           {formatCoins(item.profit_per_cycle)}
                         </td>
-                        {mode === "profit" && (
-                          <td className="px-6 py-4 text-right font-mono hidden xl:table-cell text-emerald-600 dark:text-emerald-400">
-                            {formatCoins(mutationProfitByName[item.mutationName]?.profitHr ?? 0)}
-                          </td>
-                        )}
                         <td className="px-6 py-4 text-right font-mono text-neutral-500 hidden md:table-cell">
-                          {mode === "profit"
-                            ? `${mutationProfitByName[item.mutationName]?.stages ?? item.breakdown.growth_stages} Cycles`
-                            : `${item.breakdown.growth_stages} Cycles`}
+                          {(item.breakdown.expected_fill_cycles ?? item.breakdown.growth_stages).toFixed(2)} Cycles
                         </td>
                         <td className="px-6 py-4 text-right font-mono text-neutral-500 hidden lg:table-cell">
-                          {mode === "profit"
-                            ? formatDuration(mutationProfitByName[item.mutationName]?.harvestHours ?? item.breakdown.estimated_time_hours)
-                            : formatDuration(item.breakdown.estimated_time_hours)}
+                          {formatDuration(item.breakdown.expected_fill_time_hours ?? item.breakdown.estimated_time_hours)}
                         </td>
                         <td className="px-6 py-4 text-right font-mono opacity-[0.65] hidden sm:table-cell">
                           {formatCoins(item.opt_cost)}
@@ -996,7 +699,7 @@ export default function Home() {
           </div>
 
           <div className="rounded-xl border border-amber-200/70 bg-amber-50/80 px-4 py-3 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
-            Results are based on community-tested assumptions, and some crop behaviors may still be uncertain. Verify key values in-game before placing large orders.
+            Profit/Cycle assumes you harvest all at once after mutation slots are expected to fill. Results are based on community-tested assumptions; verify key values in-game before large orders.
           </div>
         </main>
       </div>
@@ -1077,38 +780,17 @@ export default function Home() {
                     <span className="text-xs font-medium text-blue-600 dark:text-blue-400">Estimated Lifecycle Time:</span>
                     <span className="text-sm font-black text-blue-700 dark:text-blue-300">{formatDuration(selectedMutation.breakdown.estimated_time_hours)}</span>
                   </div>
-                </div>
-
-                {mode === "profit" && selectedMutationModel && (
-                  <div className="mt-4 p-4 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 space-y-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-emerald-700 dark:text-emerald-300">Harvest Mode</span>
-                      <span className="font-mono text-emerald-700 dark:text-emerald-300">
-                        {harvestMode === "afk" ? "AFK (harvest all at once)" : "ASAP (harvest when ready)"}
+                  {typeof selectedMutation.breakdown.expected_fill_cycles === "number" && (
+                    <div className="flex items-center justify-between pt-2 border-t border-blue-500/20">
+                      <span className="text-xs font-medium text-blue-600 dark:text-blue-400">Expected Fill Cycles (used for Profit/Cycle):</span>
+                      <span className="text-sm font-black text-blue-700 dark:text-blue-300">
+                        {selectedMutation.breakdown.expected_fill_cycles.toFixed(2)} Cycles
+                        {" "}
+                        ({formatDuration(selectedMutation.breakdown.expected_fill_time_hours ?? 0)})
                       </span>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs font-mono text-emerald-800 dark:text-emerald-200">
-                      <div className="rounded-lg bg-emerald-500/10 px-2 py-1">
-                        {harvestMode === "afk" ? "Expected Mutations / Harvest" : "Expected Mutations / Stage"}: {selectedMutationModel.expectedMutations.toFixed(2)}
-                      </div>
-                      <div className="rounded-lg bg-emerald-500/10 px-2 py-1">
-                        {harvestMode === "afk" ? "Window Time" : "Stage Time"}: {formatDuration(selectedMutationModel.harvestHours)}
-                      </div>
-                      <div className="rounded-lg bg-emerald-500/10 px-2 py-1">
-                        Revenue: {formatCoins(selectedMutationModel.revenue)}
-                      </div>
-                      <div className="rounded-lg bg-emerald-500/10 px-2 py-1">
-                        Costs: {formatCoins(selectedMutationModel.costs)}
-                      </div>
-                      <div className="rounded-lg bg-emerald-500/10 px-2 py-1">
-                        Net: {formatCoins(selectedMutationModel.net)}
-                      </div>
-                      <div className="rounded-lg bg-emerald-600/20 px-2 py-1 font-bold">
-                        Profit / Hour: {formatCoins(selectedMutationModel.profitHr)}
-                      </div>
-                    </div>
-                  </div>
-                )}
+                  )}
+                </div>
 
                 {selectedMutation.breakdown.yields && selectedMutation.breakdown.yields.length > 0 ? (
                   <div className="space-y-3">

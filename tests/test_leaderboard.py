@@ -46,7 +46,7 @@ class LeaderboardTests(unittest.TestCase):
         self.assertEqual(veil["breakdown"]["growth_stages"], 1)
 
     @patch("api.index.get_bazaar_prices", return_value={})
-    def test_profit_per_cycle_matches_profit_divided_by_estimated_time(self, _mock_prices):
+    def test_profit_per_cycle_uses_expected_fill_cycles(self, _mock_prices):
         result = get_leaderboard(
             plots=3,
             fortune=2500,
@@ -61,13 +61,14 @@ class LeaderboardTests(unittest.TestCase):
 
         for mutation in result["leaderboard"]:
             estimated_time = mutation["breakdown"]["estimated_time_hours"]
-            growth_stages = mutation["breakdown"]["growth_stages"]
-            if estimated_time <= 0 or growth_stages <= 0:
+            expected_fill_cycles = mutation["breakdown"]["expected_fill_cycles"]
+            if estimated_time <= 0 or expected_fill_cycles <= 0:
                 continue
-            expected_cycle = mutation["profit"] / growth_stages
+            expected_cycle = mutation["profit"] / expected_fill_cycles
             expected_hour = mutation["profit"] / estimated_time
             self.assertAlmostEqual(mutation["profit_per_cycle"], expected_cycle, places=6)
             self.assertAlmostEqual(mutation["profit_per_hour"], expected_hour, places=6)
+            self.assertGreaterEqual(mutation["breakdown"]["expected_fill_time_hours"], 0)
 
     @patch("api.index.get_bazaar_prices", return_value={})
     def test_lonelily_override_affects_profit_mode_mutation_count(self, _mock_prices):

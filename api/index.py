@@ -42,6 +42,32 @@ def has_wide_spread(price_a: float, price_b: float) -> bool:
     lo = min(price_a, price_b)
     return (hi / lo) >= SPREAD_WARNING_RATIO
 
+
+def expected_cycles_to_fill_slots(total_slots: int, spawn_chance: float) -> float:
+    slots = max(0, int(total_slots))
+    p = max(0.0, min(1.0, float(spawn_chance)))
+    if slots == 0:
+        return 0.0
+    if p <= 0.0:
+        return float("inf")
+    if p >= 1.0:
+        return 1.0
+
+    # E[max(X_1..X_n)] for geometric spawn cycles:
+    # sum_{t>=0} (1 - (1 - (1-p)^t)^n)
+    expected = 0.0
+    t = 0
+    max_iters = 20000
+    while t < max_iters:
+        q_t = (1.0 - p) ** t
+        tail = 1.0 - ((1.0 - q_t) ** slots)
+        expected += tail
+        # Once tail is tiny for many iterations, further contribution is negligible.
+        if t > 100 and tail < 1e-10:
+            break
+        t += 1
+    return max(1.0, expected)
+
 @app.get("/api/ping")
 def ping():
     return {"status": "ok"}
@@ -243,9 +269,12 @@ def get_leaderboard(
             if progress_pct > 0:
                 smart_progress[req_crop] = progress_pct
 
-        # 3. Simple Math (single base model used by default leaderboard metrics)
+        # 3. Profit metrics
         profit_batch = total_cycle_revenue - opt_cost
-        profit_per_cycle = (profit_batch / growth_stages) if growth_stages > 0 else 0.0
+        expected_fill_cycles = expected_cycles_to_fill_slots(limit, mutation_chance_effective)
+        if not math.isfinite(expected_fill_cycles) or expected_fill_cycles <= 0:
+            expected_fill_cycles = float(growth_stages)
+        profit_per_cycle = profit_batch / expected_fill_cycles
         profit_per_hour = (profit_batch / estimated_time) if estimated_time > 0 else 0.0
 
         # Deterministic expected-value model for mutation-spawn profitability over time.
@@ -290,7 +319,9 @@ def get_leaderboard(
             "total_setup_cost": opt_cost,
             "total_revenue": total_cycle_revenue,
             "growth_stages": growth_stages,
-            "estimated_time_hours": estimated_time
+            "estimated_time_hours": estimated_time,
+            "expected_fill_cycles": expected_fill_cycles,
+            "expected_fill_time_hours": expected_fill_cycles * cycle_time_hours
         }
             
         leaderboard_data.append({
