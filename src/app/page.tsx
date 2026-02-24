@@ -6,6 +6,7 @@ import { Coins, Sprout, Clock, Calculator, Loader2, ArrowUpRight, AlertTriangle,
 import {
   computeProfitHrAFK,
   computeProfitHrASAP,
+  deriveCoinsPerMutationFromBatch,
   deriveHarvestStagesFromHours,
 } from "@/lib/mutation-profit-calculator";
 import { applyFortuneChange, syncFortunesOnToggle } from "@/lib/fortune-link";
@@ -283,9 +284,17 @@ export default function Home() {
     for (const item of visibleLeaderboard) {
       const chance = item.hourly?.mutation_chance ?? 0.25;
       const slotsPerPlot = Math.max(0, item.breakdown.base_limit);
-      const itemPrice = Math.max(0, item.mut_price);
-      const baseItems = 1;
       const setupCost = Math.max(0, item.opt_cost + extraSetupCost);
+      const mutationYield = item.breakdown.yields.find((y) => y.name === item.mutationName)?.amount ?? 0;
+      const modeFortune = harvestMode === "asap" ? fortuneAsap : fortuneAfk;
+      const itemPrice = deriveCoinsPerMutationFromBatch({
+        totalRevenueAtReferenceFortune: Math.max(0, item.revenue),
+        mutationUnitPrice: Math.max(0, item.mut_price),
+        mutationsAtHarvest: mutationYield,
+        referenceFortune: fortune,
+        modeFortune,
+      });
+      const baseItems = 1;
 
       if (harvestMode === "asap") {
         const asap = computeProfitHrASAP({
@@ -293,7 +302,7 @@ export default function Home() {
           slotsPerPlot,
           mutationChance: chance,
           stageDurationHours: cycleTime,
-          fortune: fortuneAsap,
+          fortune: 0,
           baseItems,
           itemPrice,
           buffCostPerHour: buffCostAsapPerHour,
@@ -316,7 +325,7 @@ export default function Home() {
           mutationChance: chance,
           stageDurationHours: cycleTime,
           harvestStages: afkStagesDerived,
-          fortune: fortuneAfk,
+          fortune: 0,
           baseItems,
           itemPrice,
           setupCost,
@@ -346,6 +355,7 @@ export default function Home() {
     extraSetupCost,
     asapSetupAmortizeHours,
     afkStagesDerived,
+    fortune,
   ]);
 
   const toggleSort = (key: SortKey) => {

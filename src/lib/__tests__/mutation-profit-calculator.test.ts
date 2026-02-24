@@ -3,6 +3,7 @@ import {
   computeCoinsPerMutation,
   computeProfitHrAFK,
   computeProfitHrASAP,
+  deriveCoinsPerMutationFromBatch,
   deriveHarvestStagesFromHours,
 } from "@/lib/mutation-profit-calculator";
 
@@ -125,5 +126,18 @@ describe("mutation-profit-calculator", () => {
   it("converts AFK hours to stages using floor", () => {
     expect(deriveHarvestStagesFromHours(5.9, 2)).toBe(2);
     expect(deriveHarvestStagesFromHours(0.9, 1)).toBe(0);
+  });
+
+  it("derives per-mutation value without fortune inflating mutation price", () => {
+    const value = deriveCoinsPerMutationFromBatch({
+      totalRevenueAtReferenceFortune: 1000,
+      mutationUnitPrice: 10,
+      mutationsAtHarvest: 10,
+      referenceFortune: 100,
+      modeFortune: 0,
+    });
+
+    // Mutation portion is fixed at 10 each; crop portion scales from reference fortune.
+    expect(value).toBe(55);
   });
 });

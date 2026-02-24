@@ -48,6 +48,14 @@ export type ProfitHrAFKResult = {
   spawnProbabilityByHarvest: number;
 };
 
+export type PerMutationBatchValueInput = {
+  totalRevenueAtReferenceFortune: number;
+  mutationUnitPrice: number;
+  mutationsAtHarvest: number;
+  referenceFortune: number;
+  modeFortune: number;
+};
+
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const nonNegative = (value: number) => (Number.isFinite(value) ? Math.max(0, value) : 0);
 
@@ -139,4 +147,28 @@ export function computeProfitHrAFK(params: ProfitHrAFKInput): ProfitHrAFKResult 
     netProfitPerHour: harvestTimeHours > 0 ? (netProfitByHarvest / harvestTimeHours) : 0,
     spawnProbabilityByHarvest,
   };
+}
+
+export function deriveCoinsPerMutationFromBatch(input: PerMutationBatchValueInput): number {
+  const totalRevenue = nonNegative(input.totalRevenueAtReferenceFortune);
+  const mutationUnitPrice = nonNegative(input.mutationUnitPrice);
+  const mutationsAtHarvest = nonNegative(input.mutationsAtHarvest);
+  const referenceFortune = nonNegative(input.referenceFortune);
+  const modeFortune = nonNegative(input.modeFortune);
+
+  if (mutationsAtHarvest <= 0) return mutationUnitPrice;
+
+  const mutationRevenue = mutationUnitPrice * mutationsAtHarvest;
+  const cropRevenue = Math.max(0, totalRevenue - mutationRevenue);
+
+  const cropPerMutationAtReference = cropRevenue / mutationsAtHarvest;
+  const referenceFortuneMult = 1 + (referenceFortune / 100);
+  const modeFortuneMult = 1 + (modeFortune / 100);
+
+  const cropPerMutationAtBase = referenceFortuneMult > 0
+    ? cropPerMutationAtReference / referenceFortuneMult
+    : 0;
+
+  const cropPerMutationAtMode = cropPerMutationAtBase * modeFortuneMult;
+  return mutationUnitPrice + cropPerMutationAtMode;
 }
