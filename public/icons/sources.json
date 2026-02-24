@@ -1,0 +1,221 @@
+{
+  "mutations": {
+    "All-in Aloe": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/b/bb/All-in_Aloe.png/revision/latest?cb=20251206024737",
+      "file_title": "All-in Aloe.png",
+      "local_path": "public/icons/mutations/all-in-aloe.png"
+    },
+    "Ashwreath": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/1/14/Ashwreath.png/revision/latest?cb=20251206022250",
+      "file_title": "Ashwreath.png",
+      "local_path": "public/icons/mutations/ashwreath.png"
+    },
+    "Blastberry": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/2/24/Blastberry.png/revision/latest?cb=20251206024604",
+      "file_title": "Blastberry.png",
+      "local_path": "public/icons/mutations/blastberry.png"
+    },
+    "Cheesebite": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/5/5c/Cheesebite.png/revision/latest?cb=20251206023831",
+      "file_title": "Cheesebite.png",
+      "local_path": "public/icons/mutations/cheesebite.png"
+    },
+    "Chloronite": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/5/55/Chloronite.png/revision/latest?cb=20251206023420",
+      "file_title": "Chloronite.png",
+      "local_path": "public/icons/mutations/chloronite.png"
+    },
+    "Chocoberry": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/a/aa/Chocoberry.png/revision/latest?cb=20251206024333",
+      "file_title": "Chocoberry.png",
+      "local_path": "public/icons/mutations/chocoberry.png"
+    },
+    "Choconut": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/3/35/Choconut.png/revision/latest?cb=20251206024111",
+      "file_title": "Choconut.png",
+      "local_path": "public/icons/mutations/choconut.png"
+    },
+    "Chorus Fruit": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/e/ef/Chorus_Fruit.png/revision/latest?cb=20251206023050",
+      "file_title": "Chorus Fruit.png",
+      "local_path": "public/icons/mutations/chorus-fruit.png"
+    },
+    "Cindershade": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/9/99/Cindershade.png/revision/latest?cb=20251206023656",
+      "file_title": "Cindershade.png",
+      "local_path": "public/icons/mutations/cindershade.png"
+    },
+    "Coalroot": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/0/00/Coalroot.png/revision/latest?cb=20251206025928",
+      "file_title": "Coalroot.png",
+      "local_path": "public/icons/mutations/coalroot.png"
+    },
+    "Creambloom": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/6/62/Creambloom.png/revision/latest?cb=20251206023202",
+      "file_title": "Creambloom.png",
+      "local_path": "public/icons/mutations/creambloom.png"
+    },
+    "Devourer": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/b/be/Devourer.png/revision/latest?cb=20251206030555",
+      "file_title": "Devourer.png",
+      "local_path": "public/icons/mutations/devourer.png"
+    },
+    "Do-not-eat-shroom": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/8/85/Do-not-eat-shroom.png/revision/latest?cb=20251206024246",
+      "file_title": "Do-not-eat-shroom.png",
+      "local_path": "public/icons/mutations/do-not-eat-shroom.png"
+    },
+    "Duskbloom": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/f/fa/Duskbloom.png/revision/latest?cb=20251206022438",
+      "file_title": "Duskbloom.png",
+      "local_path": "public/icons/mutations/duskbloom.png"
+    },
+    "Dustgrain": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/7/71/Dustgrain.png/revision/latest?cb=20251206030010",
+      "file_title": "Dustgrain.png",
+      "local_path": "public/icons/mutations/dustgrain.png"
+    },
+    "Fleshtrap": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/3/3b/Fleshtrap.png/revision/latest?cb=20251206025555",
+      "file_title": "Fleshtrap.png",
+      "local_path": "public/icons/mutations/fleshtrap.png"
+    },
+    "Glasscorn": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/a/a7/Glasscorn.png/revision/latest?cb=20251206025010",
+      "file_title": "Glasscorn.png",
+      "local_path": "public/icons/mutations/glasscorn.png"
+    },
+    "Gloomgourd": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/3/31/Gloomgourd.png/revision/latest?cb=20251206030333",
+      "file_title": "Gloomgourd.png",
+      "local_path": "public/icons/mutations/gloomgourd.png"
+    },
+    "Godseed": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/b/b6/Godseed.png/revision/latest?cb=20251206030116",
+      "file_title": "Godseed.png",
+      "local_path": "public/icons/mutations/godseed.png"
+    },
+    "Lonelily": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/8/83/Lonelily.png/revision/latest?cb=20251206023330",
+      "file_title": "Lonelily.png",
+      "local_path": "public/icons/mutations/lonelily.png"
+    },
+    "Magic Jellybean": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/8/80/Magic_Jellybean.png/revision/latest?cb=20251206023554",
+      "file_title": "Magic Jellybean.png",
+      "local_path": "public/icons/mutations/magic-jellybean.png"
+    },
+    "Noctilume": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/a/a7/Noctilume.png/revision/latest?cb=20251206025649",
+      "file_title": "Noctilume.png",
+      "local_path": "public/icons/mutations/noctilume.png"
+    },
+    "Phantomleaf": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/9/93/Phantomleaf.png/revision/latest?cb=20251206025831",
+      "file_title": "Phantomleaf.png",
+      "local_path": "public/icons/mutations/phantomleaf.png"
+    },
+    "Plant Boy Advance": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/2/23/PlantBoy_Advance.png/revision/latest?cb=20251206023744",
+      "file_title": "PlantBoy Advance.png",
+      "local_path": "public/icons/mutations/plant-boy-advance.png"
+    },
+    "Puffercloud": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/2/2d/Puffercloud.png/revision/latest?cb=20251206024418",
+      "file_title": "Puffercloud.png",
+      "local_path": "public/icons/mutations/puffercloud.png"
+    },
+    "Scourroot": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/c/c4/Scourroot.png/revision/latest?cb=20251206023923",
+      "file_title": "Scourroot.png",
+      "local_path": "public/icons/mutations/scourroot.png"
+    },
+    "Shadevine": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/7/78/Shadevine.png/revision/latest?cb=20251206022535",
+      "file_title": "Shadevine.png",
+      "local_path": "public/icons/mutations/shadevine.png"
+    },
+    "Shellfruit": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/d/d4/Shellfruit.png/revision/latest?cb=20251206022346",
+      "file_title": "Shellfruit.png",
+      "local_path": "public/icons/mutations/shellfruit.png"
+    },
+    "Snoozling": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/e/e5/Snoozling.png/revision/latest?cb=20251206030159",
+      "file_title": "Snoozling.png",
+      "local_path": "public/icons/mutations/snoozling.png"
+    },
+    "Soggybud": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/d/de/Soggybud.png/revision/latest?cb=20251206030248",
+      "file_title": "Soggybud.png",
+      "local_path": "public/icons/mutations/soggybud.png"
+    },
+    "Startlevine": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/9/95/Startlevine.png/revision/latest?cb=20251206024026",
+      "file_title": "Startlevine.png",
+      "local_path": "public/icons/mutations/startlevine.png"
+    },
+    "Stoplight Petal": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/0/07/Stoplight_Petal.png/revision/latest?cb=20251206025422",
+      "file_title": "Stoplight Petal.png",
+      "local_path": "public/icons/mutations/stoplight-petal.png"
+    },
+    "Thornshade": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/0/04/Thornshade.png/revision/latest?cb=20251206025514",
+      "file_title": "Thornshade.png",
+      "local_path": "public/icons/mutations/thornshade.png"
+    },
+    "Thunderling": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/0/09/Thunderling.png/revision/latest?cb=20251206024155",
+      "file_title": "Thunderling.png",
+      "local_path": "public/icons/mutations/thunderling.png"
+    },
+    "Timestalk": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/8/81/Timestalk.png/revision/latest?cb=20251206030510",
+      "file_title": "Timestalk.png",
+      "local_path": "public/icons/mutations/timestalk.png"
+    },
+    "TURTLELLINI": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/a/ac/Turtlellini.png/revision/latest?cb=20251206030426",
+      "file_title": "Turtlellini.png",
+      "local_path": "public/icons/mutations/turtlellini.png"
+    },
+    "Veilshroom": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/3/31/Veilshroom.png/revision/latest?cb=20251206022140",
+      "file_title": "Veilshroom.png",
+      "local_path": "public/icons/mutations/veilshroom.png"
+    },
+    "Witherbloom": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/3/3c/Witherbloom.png/revision/latest?cb=20251206023508",
+      "file_title": "Witherbloom.png",
+      "local_path": "public/icons/mutations/witherbloom.png"
+    },
+    "Zombud": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/c/c1/Zombud.png/revision/latest?cb=20251206025732",
+      "file_title": "Zombud.png",
+      "local_path": "public/icons/mutations/zombud.png"
+    }
+  },
+  "buffs": {
+    "Harvest Harbinger Potion": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/d/d4/Fire_Resistance_Potion.png/revision/latest?cb=20210816181202",
+      "file_title": "Harvest Harbinger Potion.png",
+      "local_path": "public/icons/buffs/harvest-harbinger-potion.png"
+    },
+    "Hypercharge Chip": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/e/e9/Hypercharge_Chip.png/revision/latest?cb=20251206012127",
+      "file_title": "Hypercharge Chip.png",
+      "local_path": "public/icons/buffs/hypercharge-chip.png"
+    },
+    "Refined Dark Cacao Truffle": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/7/70/Refined_Dark_Cacao_Truffle.png/revision/latest?cb=20240501045459",
+      "file_title": "Refined Dark Cacao Truffle.png",
+      "local_path": "public/icons/buffs/refined-dark-cacao-truffle.png"
+    },
+    "InfiniVacuum Hooverius": {
+      "source_url": "https://wiki.hypixel.net/Special:FilePath/Minecraft_items_minecart_with_tnt.png",
+      "file_title": "Minecraft_items_minecart_with_tnt.png",
+      "local_path": "public/icons/buffs/infini-vacuum-hooverius.png"
+    }
+  }
+}

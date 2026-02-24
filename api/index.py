@@ -59,7 +59,11 @@ def get_leaderboard(
     maxed_crops: str = Query(""),  # Comma-separated list
     mutation_chance: float = Query(0.25, gt=0.0, lt=1.0),
     harvest_mode: str = Query("full"),  # "full" or "custom_time"
-    custom_time_hours: float = Query(24.0, gt=0.0)
+    custom_time_hours: float = Query(24.0, gt=0.0),
+    harvest_harbinger: bool = Query(False),
+    infini_vacuum: bool = Query(False),
+    dark_cacao: bool = Query(False),
+    hypercharge_level: int = Query(0, ge=0, le=20),
 ) -> Dict[str, Any]:
     # Normalize FastAPI Query defaults when function is called directly in tests/scripts.
     if not isinstance(maxed_crops, str):
@@ -70,6 +74,8 @@ def get_leaderboard(
         harvest_mode = "full"
     if not isinstance(custom_time_hours, (int, float)):
         custom_time_hours = 24.0
+    if not isinstance(hypercharge_level, int):
+        hypercharge_level = 0
     
     # Load Data
     bazaar_data = get_bazaar_prices()
@@ -93,8 +99,17 @@ def get_leaderboard(
     unique_buff = (unique_crops / 12.0) * 0.36
     additive_base = 1.6 + gh_buff + unique_buff
     
+    # Buff fortune model:
+    # Harvest Harbinger (+50) is unaffected by Hypercharge.
+    # InfiniVacuum (+200) and Dark Cacao (+30) are affected by Hypercharge.
+    affected_multiplier = 1.0 + (max(0, min(20, hypercharge_level)) / 20.0)
+    unaffected_bonus = 50.0 if harvest_harbinger else 0.0
+    affected_bonus_base = (200.0 if infini_vacuum else 0.0) + (30.0 if dark_cacao else 0.0)
+    total_bonus = unaffected_bonus + (affected_bonus_base * affected_multiplier)
+    effective_fortune = fortune + total_bonus
+
     wart_buff = 1.3
-    fortune_mult = ((fortune / 100) + 1)
+    fortune_mult = ((effective_fortune / 100) + 1)
     
     calc_mult = additive_base * wart_buff * fortune_mult
     
@@ -325,6 +340,16 @@ def get_leaderboard(
         "leaderboard": leaderboard_data,
         "metadata": {
             "cycle_time_hours": cycle_time_hours,
-            "missing_crops": missing_crops
+            "missing_crops": missing_crops,
+            "fortune_breakdown": {
+                "base_fortune": fortune,
+                "effective_fortune": effective_fortune,
+                "bonus_total": total_bonus,
+                "harvest_harbinger": harvest_harbinger,
+                "infini_vacuum": infini_vacuum,
+                "dark_cacao": dark_cacao,
+                "hypercharge_level": hypercharge_level,
+                "affected_multiplier": affected_multiplier,
+            },
         }
     }

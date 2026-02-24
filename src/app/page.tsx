@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Coins, Sprout, Clock, Calculator, Loader2, ArrowUpRight, AlertTriangle, X } from "lucide-react";
+import Image from "next/image";
 
 type OptimizationMode = "profit" | "smart" | "target";
 type SetupMode = "buy_order" | "insta_buy";
@@ -65,6 +66,16 @@ type LeaderboardResponse = {
   metadata: {
     cycle_time_hours: number;
     missing_crops?: string[];
+    fortune_breakdown?: {
+      base_fortune: number;
+      effective_fortune: number;
+      bonus_total: number;
+      harvest_harbinger: boolean;
+      infini_vacuum: boolean;
+      dark_cacao: boolean;
+      hypercharge_level: number;
+      affected_multiplier: number;
+    };
   };
 };
 
@@ -80,10 +91,16 @@ const cropLabelMap: Record<string, string> = {
 };
 
 const toCropLabel = (crop: string) => cropLabelMap[crop] ?? crop;
+const toMutationIconPath = (mutationName: string) =>
+  `/icons/mutations/${mutationName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}.png`;
 
 export default function Home() {
   const [plots, setPlots] = useState(3);
   const [fortune, setFortune] = useState(2500);
+  const [useHarvestHarbinger, setUseHarvestHarbinger] = useState(false);
+  const [useInfiniVacuum, setUseInfiniVacuum] = useState(false);
+  const [useDarkCacao, setUseDarkCacao] = useState(false);
+  const [hyperchargeLevel, setHyperchargeLevel] = useState(0);
   const [ghUpgrade, setGhUpgrade] = useState(9);
   const [uniqueCrops, setUniqueCrops] = useState(12);
 
@@ -147,6 +164,10 @@ export default function Home() {
         const query = new URLSearchParams({
           plots: plots.toString(),
           fortune: fortune.toString(),
+          harvest_harbinger: useHarvestHarbinger ? "true" : "false",
+          infini_vacuum: useInfiniVacuum ? "true" : "false",
+          dark_cacao: useDarkCacao ? "true" : "false",
+          hypercharge_level: hyperchargeLevel.toString(),
           gh_upgrade: ghUpgrade.toString(),
           unique_crops: uniqueCrops.toString(),
           mode: mode,
@@ -166,7 +187,21 @@ export default function Home() {
       }
     }
     fetchData();
-  }, [plots, fortune, ghUpgrade, uniqueCrops, mode, setupMode, sellMode, targetCrop, maxedCrops]);
+  }, [
+    plots,
+    fortune,
+    useHarvestHarbinger,
+    useInfiniVacuum,
+    useDarkCacao,
+    hyperchargeLevel,
+    ghUpgrade,
+    uniqueCrops,
+    mode,
+    setupMode,
+    sellMode,
+    targetCrop,
+    maxedCrops,
+  ]);
 
   const toggleMaxedCrop = (crop: string) => {
     setMaxedCrops(prev =>
@@ -423,6 +458,59 @@ export default function Home() {
                 onChange={(e) => setFortune(Number(e.target.value))}
                 className="w-full accent-emerald-500"
               />
+              {data?.metadata.fortune_breakdown && (
+                <p className="mt-2 text-xs text-emerald-700 dark:text-emerald-300">
+                  Effective Fortune: {Math.round(data.metadata.fortune_breakdown.effective_fortune)} (+{Math.round(data.metadata.fortune_breakdown.bonus_total)})
+                </p>
+              )}
+            </div>
+
+            <div className="mb-6 rounded-xl border border-neutral-200 dark:border-neutral-800 p-3 space-y-3">
+              <p className="text-sm font-medium">Fortune Buffs</p>
+
+              <label className="flex items-center justify-between gap-3">
+                <span className="inline-flex items-center gap-2 text-xs">
+                  <Image src="/icons/buffs/harvest-harbinger-potion.png" alt="Harvest Harbinger Potion" width={20} height={20} className="w-5 h-5 rounded-sm" />
+                  Harvest Harbinger (+50, unaffected)
+                </span>
+                <input type="checkbox" checked={useHarvestHarbinger} onChange={(e) => setUseHarvestHarbinger(e.target.checked)} className="accent-emerald-500" />
+              </label>
+
+              <label className="flex items-center justify-between gap-3">
+                <span className="inline-flex items-center gap-2 text-xs">
+                  <Image src="/icons/buffs/infini-vacuum-hooverius.png" alt="InfiniVacuum Hooverius" width={20} height={20} className="w-5 h-5 rounded-sm" />
+                  InfiniVacuum Hooverius (+200, affected)
+                </span>
+                <input type="checkbox" checked={useInfiniVacuum} onChange={(e) => setUseInfiniVacuum(e.target.checked)} className="accent-emerald-500" />
+              </label>
+
+              <label className="flex items-center justify-between gap-3">
+                <span className="inline-flex items-center gap-2 text-xs">
+                  <Image src="/icons/buffs/refined-dark-cacao-truffle.png" alt="Refined Dark Cacao Truffle" width={20} height={20} className="w-5 h-5 rounded-sm" />
+                  Refined Dark Cacao Truffle (+30, affected)
+                </span>
+                <input type="checkbox" checked={useDarkCacao} onChange={(e) => setUseDarkCacao(e.target.checked)} className="accent-emerald-500" />
+              </label>
+
+              <div>
+                <label className="flex items-center justify-between text-xs mb-1">
+                  <span className="inline-flex items-center gap-2">
+                    <Image src="/icons/buffs/hypercharge-chip.png" alt="Hypercharge Chip" width={20} height={20} className="w-5 h-5 rounded-sm" />
+                    Hypercharge Chip Level (0-20)
+                  </span>
+                  <span className="text-emerald-600 dark:text-emerald-400">{hyperchargeLevel}</span>
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="20"
+                  step="1"
+                  value={hyperchargeLevel}
+                  onChange={(e) => setHyperchargeLevel(Number(e.target.value))}
+                  className="w-full accent-emerald-500"
+                />
+                <p className="text-[11px] text-neutral-500 mt-1">Hypercharge only scales affected buffs (Vacuum + Dark Cacao), up to +100% at level 20.</p>
+              </div>
             </div>
 
             {/* Greenhouse Upgrade Slider */}
@@ -641,7 +729,19 @@ export default function Home() {
                         </td>
                         <td className="px-6 py-4 font-medium flex items-center gap-3">
                           <div className="w-8 h-8 shrink-0 flex items-center justify-center bg-neutral-100 dark:bg-neutral-800 rounded-md border border-neutral-200 dark:border-neutral-700 text-lg">
-                            <Sprout className="w-4 h-4 text-emerald-500" />
+                            <Image
+                              src={toMutationIconPath(item.mutationName)}
+                              alt={`${item.mutationName} icon`}
+                              width={20}
+                              height={20}
+                              className="w-5 h-5 object-contain"
+                              onError={(e) => {
+                                const target = e.currentTarget;
+                                target.style.display = "none";
+                                target.parentElement?.classList.add("icon-fallback");
+                              }}
+                            />
+                            <Sprout className="w-4 h-4 text-emerald-500 icon-fallback-glyph hidden" />
                           </div>
                           <div>
                             <span className="hover:text-amber-500 transition-colors">{item.mutationName}</span>
@@ -703,7 +803,19 @@ export default function Home() {
             <div className="p-6 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between bg-neutral-50/50 dark:bg-neutral-900/50">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 shrink-0 flex items-center justify-center bg-emerald-100 dark:bg-emerald-900/30 rounded-xl border border-emerald-200 dark:border-emerald-800 text-2xl shadow-sm">
-                  <Sprout className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+                  <Image
+                    src={toMutationIconPath(selectedMutation.mutationName)}
+                    alt={`${selectedMutation.mutationName} icon`}
+                    width={28}
+                    height={28}
+                    className="w-7 h-7 object-contain"
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      target.style.display = "none";
+                      target.parentElement?.classList.add("icon-fallback");
+                    }}
+                  />
+                  <Sprout className="w-6 h-6 text-emerald-600 dark:text-emerald-400 icon-fallback-glyph hidden" />
                 </div>
                 <div>
                   <h3 className="text-xl font-bold">{selectedMutation.mutationName} Breakdown</h3>
@@ -817,6 +929,9 @@ export default function Home() {
       )}
 
       <style jsx global>{`
+        .icon-fallback .icon-fallback-glyph {
+          display: block;
+        }
         .custom-scrollbar::-webkit-scrollbar {
           width: 6px;
         }

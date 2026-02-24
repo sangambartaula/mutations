@@ -7,6 +7,29 @@ from api.index import get_leaderboard
 
 class LeaderboardTests(unittest.TestCase):
     @patch("api.index.get_bazaar_prices", return_value={})
+    def test_mode_specific_fortune_buff_math(self, _mock_prices):
+        result = get_leaderboard(
+            plots=3,
+            fortune=100,
+            gh_upgrade=9,
+            unique_crops=12,
+            mode="profit",
+            setup_mode="buy_order",
+            sell_mode="sell_offer",
+            target_crop=None,
+            maxed_crops="",
+            harvest_harbinger=True,
+            infini_vacuum=True,
+            dark_cacao=True,
+            hypercharge_level=20,
+        )
+
+        breakdown = result["metadata"]["fortune_breakdown"]
+        self.assertEqual(breakdown["base_fortune"], 100)
+        self.assertEqual(breakdown["bonus_total"], 510)
+        self.assertEqual(breakdown["effective_fortune"], 610)
+
+    @patch("api.index.get_bazaar_prices", return_value={})
     def test_veilshroom_is_included_with_recipe(self, _mock_prices):
         result = get_leaderboard(
             plots=3,
