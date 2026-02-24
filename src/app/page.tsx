@@ -103,12 +103,10 @@ const toMutationLabel = (mutation: string) => {
 };
 const toMutationIconPath = (mutationName: string) =>
   `/icons/mutations/${mutationName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}.png`;
-const profitPerCycleTooltipLines = [
-  "Expected profit per global growth tick (long-run average).",
-  "Model: independent spots using a steady-state renewal process.",
-  "Profit / Cycle = (N * v_net) / ((1 / p) + g).",
-  "Profit / Hour = Profit / Cycle / tau.",
-  "Actual harvests are random and can be bursty, especially for low spawn rates.",
+const avgValuePerCycleTooltipLines = [
+  "Long-run expected value generated per global growth cycle.",
+  "Results may vary significantly over short time spans,",
+  "especially for low spawn rates or high growth stages.",
 ];
 
 export default function Home() {
@@ -821,19 +819,19 @@ export default function Home() {
                         <th className="px-6 py-4 font-semibold text-right text-sky-600 dark:text-sky-400 hidden lg:table-cell">
                           <div className="inline-flex items-center justify-end gap-2">
                             <button type="button" onClick={() => toggleSort("cycle_profit")} className="inline-flex items-center gap-1">
-                              Profit / Cycle <span aria-hidden="true">{sortIndicator("cycle_profit")}</span>
+                              Avg Value / Cycle <span aria-hidden="true">{sortIndicator("cycle_profit")}</span>
                             </button>
                             <div className="group relative">
                               <button
                                 type="button"
                                 tabIndex={0}
-                                aria-label="Profit per cycle info"
+                                aria-label="Average value per cycle info"
                                 className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-sky-500/50 text-[10px] leading-none cursor-help"
                               >
                                 <Info className="h-3 w-3" />
                               </button>
                               <div className="absolute left-1/2 top-full z-20 mt-2 w-80 -translate-x-1/2 rounded bg-neutral-900 px-3 py-2 text-left text-[11px] font-normal normal-case tracking-normal text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-                                {profitPerCycleTooltipLines.map((line) => (
+                                {avgValuePerCycleTooltipLines.map((line) => (
                                   <p key={line} className="leading-snug">
                                     {line}
                                   </p>
