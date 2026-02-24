@@ -8,7 +8,7 @@ import Image from "next/image";
 type OptimizationMode = "profit" | "smart" | "target";
 type SetupMode = "buy_order" | "insta_buy";
 type SellMode = "sell_offer" | "insta_sell";
-type SortKey = "rank" | "mutation" | "value" | "cycle_profit" | "cycles" | "setup";
+type SortKey = "rank" | "mutation" | "value" | "cycle_profit" | "break_even" | "cycles" | "setup";
 type SortDirection = "asc" | "desc";
 
 type YieldMath = {
@@ -52,6 +52,8 @@ type LeaderboardItem = {
   profit: number;
   profit_per_cycle: number;
   profit_per_hour: number;
+  break_even_cycles?: number | null;
+  break_even_cycles_display?: string;
   opt_cost: number;
   revenue: number;
   warning: boolean;
@@ -105,9 +107,14 @@ const toMutationIconPath = (mutationName: string) =>
   `/icons/mutations/${mutationName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}.png`;
 const avgValuePerCycleTooltipLines = [
   "Long-run expected value generated per global growth cycle.",
-  "Results may vary significantly over short time spans,",
-  "especially for low spawn rates or high growth stages.",
+  "This metric already accounts for spawn chance and growth delay.",
+  "Growth Cycles shown in the table represent maturation time after spawn and are NOT the number of cycles required to break even.",
 ];
+const breakEvenCyclesTooltipLines = [
+  "Cycles needed to recoup setup cost at the long-run rate.",
+  "Includes expected spawn-wait time (1/p) and growth delay (g).",
+];
+const setupCostNote = "Some mutations decay after a few days, so setup cost may recur.";
 
 export default function Home() {
   const [plots, setPlots] = useState(3);
@@ -394,12 +401,13 @@ export default function Home() {
       return;
     }
     setSortKey(key);
-    setSortDirection(key === "mutation" ? "asc" : "desc");
+    setSortDirection((key === "mutation" || key === "break_even") ? "asc" : "desc");
   };
 
   const sortValue = (item: LeaderboardItem, key: SortKey) => {
     if (key === "mutation") return item.mutationName.toLowerCase();
     if (key === "cycle_profit") return mode === "profit" ? item.profit_per_cycle : item.score;
+    if (key === "break_even") return item.break_even_cycles ?? null;
     if (key === "cycles") return item.hourly?.g ?? item.breakdown.growth_stages;
     if (key === "setup") return item.opt_cost;
     if (key === "value") {
@@ -416,6 +424,19 @@ export default function Home() {
   };
 
   const sortedLeaderboard = [...visibleLeaderboard].sort((a, b) => {
+    if (sortKey === "break_even") {
+      const av = sortValue(a, sortKey);
+      const bv = sortValue(b, sortKey);
+      const aNever = av === null || !Number.isFinite(Number(av));
+      const bNever = bv === null || !Number.isFinite(Number(bv));
+
+      if (aNever !== bNever) return aNever ? 1 : -1; // "Never" always at bottom
+      if (aNever && bNever) return 0;
+
+      const cmpBreakEven = Number(av) - Number(bv);
+      return sortDirection === "asc" ? cmpBreakEven : -cmpBreakEven;
+    }
+
     const av = sortValue(a, sortKey);
     const bv = sortValue(b, sortKey);
     let cmp = 0;
@@ -427,6 +448,15 @@ export default function Home() {
   const sortIndicator = (key: SortKey) => {
     if (sortKey !== key) return "↕";
     return sortDirection === "asc" ? "↑" : "↓";
+  };
+
+  const formatBreakEvenCycles = (item: LeaderboardItem) => {
+    if (item.break_even_cycles_display && item.break_even_cycles_display.length > 0) {
+      return item.break_even_cycles_display;
+    }
+    const raw = item.break_even_cycles;
+    if (typeof raw !== "number" || !Number.isFinite(raw) || raw <= 0) return "Never";
+    return Math.ceil(raw).toLocaleString("en-US");
   };
 
   const scrollLeaderboardBy = (pixels: number) => {
@@ -844,6 +874,32 @@ export default function Home() {
                           </div>
                         </th>
                       )}
+                      {mode === "profit" && (
+                        <th className="px-6 py-4 font-semibold text-right text-cyan-600 dark:text-cyan-400 hidden xl:table-cell">
+                          <div className="inline-flex items-center justify-end gap-2">
+                            <button type="button" onClick={() => toggleSort("break_even")} className="inline-flex items-center gap-1">
+                              Break-even (Cycles) <span aria-hidden="true">{sortIndicator("break_even")}</span>
+                            </button>
+                            <div className="group relative">
+                              <button
+                                type="button"
+                                tabIndex={0}
+                                aria-label="Break-even cycles info"
+                                className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-cyan-500/50 text-[10px] leading-none cursor-help"
+                              >
+                                <Info className="h-3 w-3" />
+                              </button>
+                              <div className="absolute left-1/2 top-full z-20 mt-2 w-72 -translate-x-1/2 rounded bg-neutral-900 px-3 py-2 text-left text-[11px] font-normal normal-case tracking-normal text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                                {breakEvenCyclesTooltipLines.map((line) => (
+                                  <p key={line} className="leading-snug">
+                                    {line}
+                                  </p>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </th>
+                      )}
                       <th className="px-6 py-4 font-semibold text-right hidden md:table-cell">
                         <button type="button" onClick={() => toggleSort("cycles")} className="inline-flex items-center gap-1">
                           Growth Cycles <span aria-hidden="true">{sortIndicator("cycles")}</span>
@@ -853,9 +909,24 @@ export default function Home() {
                         Time
                       </th>
                       <th className="px-6 py-4 font-semibold text-right hidden sm:table-cell">
-                        <button type="button" onClick={() => toggleSort("setup")} className="inline-flex items-center gap-1">
-                          Setup Cost <span aria-hidden="true">{sortIndicator("setup")}</span>
-                        </button>
+                        <div className="inline-flex items-center justify-end gap-2">
+                          <button type="button" onClick={() => toggleSort("setup")} className="inline-flex items-center gap-1">
+                            Setup Cost <span aria-hidden="true">{sortIndicator("setup")}</span>
+                          </button>
+                          <div className="group relative">
+                            <button
+                              type="button"
+                              tabIndex={0}
+                              aria-label="Setup cost note"
+                              className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-neutral-500/50 text-[10px] leading-none cursor-help"
+                            >
+                              <Info className="h-3 w-3" />
+                            </button>
+                            <div className="absolute left-1/2 top-full z-20 mt-2 w-72 -translate-x-1/2 rounded bg-neutral-900 px-3 py-2 text-left text-[11px] font-normal normal-case tracking-normal text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                              <p className="leading-snug">{setupCostNote}</p>
+                            </div>
+                          </div>
+                        </div>
                       </th>
                     </tr>
                   </thead>
@@ -929,6 +1000,11 @@ export default function Home() {
                         {mode === "profit" && (
                           <td className="px-6 py-4 text-right font-mono font-bold text-sky-600 dark:text-sky-400 hidden lg:table-cell">
                             {formatCoins(item.profit_per_cycle)}
+                          </td>
+                        )}
+                        {mode === "profit" && (
+                          <td className="px-6 py-4 text-right font-mono font-bold text-cyan-600 dark:text-cyan-400 hidden xl:table-cell">
+                            {formatBreakEvenCycles(item)}
                           </td>
                         )}
                         <td className="px-6 py-4 text-right font-mono text-neutral-500 hidden md:table-cell">
