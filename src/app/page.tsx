@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { ModeToggle } from "@/components/mode-toggle";
-import { Coins, Sprout, Clock, Calculator, Loader2, ArrowUpRight, AlertTriangle, X } from "lucide-react";
+import { Coins, Sprout, Clock, Calculator, Loader2, ArrowUpRight, AlertTriangle, X, Info } from "lucide-react";
 import Image from "next/image";
 
 type OptimizationMode = "profit" | "smart" | "target";
@@ -824,13 +824,14 @@ export default function Home() {
                               Profit / Cycle <span aria-hidden="true">{sortIndicator("cycle_profit")}</span>
                             </button>
                             <div className="group relative">
-                              <span
+                              <button
+                                type="button"
                                 tabIndex={0}
                                 aria-label="Profit per cycle info"
                                 className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-sky-500/50 text-[10px] leading-none cursor-help"
                               >
-                                i
-                              </span>
+                                <Info className="h-3 w-3" />
+                              </button>
                               <div className="absolute left-1/2 top-full z-20 mt-2 w-80 -translate-x-1/2 rounded bg-neutral-900 px-3 py-2 text-left text-[11px] font-normal normal-case tracking-normal text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                                 {profitPerCycleTooltipLines.map((line) => (
                                   <p key={line} className="leading-snug">
