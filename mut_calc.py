@@ -1,9 +1,7 @@
 from typing import Any, Dict, List
 import math
 
-MAX_FLOAT = 1e308
 SMALL_P_WARNING_CYCLES = 1e6
-LARGE_T0_WARNING_HOURS = 1e6
 
 
 def _safe_float(value: Any, name: str) -> float:
@@ -13,14 +11,11 @@ def _safe_float(value: Any, name: str) -> float:
         raise ValueError(f"{name} must be a number")
 
 
-def _safe_int_nonneg(value: Any, name: str) -> int:
+def _safe_int(value: Any, name: str) -> int:
     try:
-        iv = int(value)
+        return int(value)
     except (TypeError, ValueError):
         raise ValueError(f"{name} must be an integer")
-    if iv < 0:
-        raise ValueError(f"{name} must be >= 0")
-    return iv
 
 
 def format_warning_for_small_p(p: float) -> str:
@@ -28,53 +23,52 @@ def format_warning_for_small_p(p: float) -> str:
     return f"Expected spawn wait = 1/p cycles (~{cycles:.2f} cycles). Consider checking p value."
 
 
-def _finite_or_cap(value: float, warnings: List[str], label: str) -> float:
-    if math.isnan(value):
-        warnings.append(f"{label} was NaN; returning 0.")
-        return 0.0
-    if math.isinf(value):
-        capped = MAX_FLOAT if value > 0 else -MAX_FLOAT
-        warnings.append(f"{label} overflowed; capped to {capped:.3e}.")
-        return capped
-    if value > MAX_FLOAT:
-        warnings.append(f"{label} exceeded max float; capped to {MAX_FLOAT:.3e}.")
-        return MAX_FLOAT
-    if value < -MAX_FLOAT:
-        warnings.append(f"{label} exceeded min float; capped to {-MAX_FLOAT:.3e}.")
-        return -MAX_FLOAT
+def _ensure_finite(value: float, name: str) -> float:
+    if not math.isfinite(value):
+        raise ValueError(f"{name} became non-finite")
     return float(value)
 
 
 def compute_profit_rates(inputs: Dict[str, Any]) -> Dict[str, Any]:
-    """Compute deterministic mutation profit rates using expected-value math.
+    """Compute expected mutation throughput and profit rates on a global growth-cycle model.
 
-    Formulas:
+    Inputs:
+    - m: plots
+    - x: eligible spots per plot
+    - p: spawn probability per empty spot per cycle, in (0,1]
+    - tau: hours per global garden growth cycle
+    - g: required growth cycles AFTER spawn until harvestable (g=0 instant)
+    - v: gross coins per harvested mature mutation
+    - per_harvest_cost: optional per harvested mutation cost (subtracted from v)
+    - H, B, v_boost: optional batch strategy params
+
+    Core formulas:
     - N = m * x
-    - t0 = tau * (1/p + k)
-    - rate_ready = N / t0
-    - revenue_hr_ready = rate_ready * v
-    - profit_hr_ready = revenue_hr_ready - (rate_ready * c)
+    - cycles_per_harvest_per_spot = 1/p + g
+    - hours_per_harvest_per_spot = tau * (1/p + g)
+    - harvests_per_hour = N / hours_per_harvest_per_spot
+    - harvests_per_cycle = N / (1/p + g)
+    - profit_per_hour = harvests_per_hour * (v - per_harvest_cost)
+    - profit_per_cycle = harvests_per_cycle * (v - per_harvest_cost)
 
-    Batch strategy (computed only when H > 0):
+    Optional batch strategy (H > 0):
     - w = H/2
-    - teff = t0 + w
-    - rate_batch = N / teff
-    - revenue_hr_batch = rate_batch * v_boost
-    - boost_cost_hr = B / H
-    - profit_hr_batch = revenue_hr_batch - boost_cost_hr
+    - t_eff = tau*(1/p + g) + w
+    - harvests_per_hour_batch = N / t_eff
+    - profit_per_hour_batch = harvests_per_hour_batch*(v_boost - per_harvest_cost) - (B/H)
+    - profit_per_cycle_batch = profit_per_hour_batch * tau
     """
-
     p = _safe_float(inputs.get("p"), "p")
     tau = _safe_float(inputs.get("tau"), "tau")
-    m = _safe_int_nonneg(inputs.get("m"), "m")
-    x = _safe_int_nonneg(inputs.get("x"), "x")
-    k_raw = inputs.get("k", 0)
-    k = _safe_int_nonneg(k_raw, "k")
+    m = _safe_int(inputs.get("m"), "m")
+    x = _safe_int(inputs.get("x"), "x")
+    g = _safe_int(inputs.get("g"), "g")
     v = _safe_float(inputs.get("v"), "v")
-    v_boost = _safe_float(inputs.get("v_boost", v), "v_boost")
-    B = _safe_float(inputs.get("B", 0.0), "B")
+    per_harvest_cost = _safe_float(inputs.get("per_harvest_cost", 0.0), "per_harvest_cost")
     H = _safe_float(inputs.get("H", 0.0), "H")
-    c = _safe_float(inputs.get("c", 0.0), "c")
+    B = _safe_float(inputs.get("B", 0.0), "B")
+    v_boost_raw = inputs.get("v_boost", None)
+    v_boost = _safe_float(v_boost_raw if v_boost_raw is not None else v, "v_boost")
 
     if p <= 0.0 or p > 1.0:
         raise ValueError("p must be in (0, 1]")
@@ -84,96 +78,79 @@ def compute_profit_rates(inputs: Dict[str, Any]) -> Dict[str, Any]:
         raise ValueError("m must be > 0")
     if x <= 0:
         raise ValueError("x must be > 0")
-    if k < 0:
-        raise ValueError("k must be >= 0")
+    if g < 0:
+        raise ValueError("g must be >= 0")
     if H < 0.0:
         raise ValueError("H must be >= 0")
 
     warnings: List[str] = []
-
     inv_p = 1.0 / p
     if inv_p > SMALL_P_WARNING_CYCLES:
-        warnings.append(
-            "extremely low spawn probability - expected spawn wait = "
-            f"1/p cycles (~{inv_p:.2f} cycles)"
-        )
         warnings.append(format_warning_for_small_p(p))
 
     N = float(m * x)
-    t0 = tau * (inv_p + float(k))
+    cycles_per_harvest_per_spot = inv_p + float(g)
+    hours_per_harvest_per_spot = tau * cycles_per_harvest_per_spot
 
-    if t0 > LARGE_T0_WARNING_HOURS:
-        warnings.append(
-            f"extremely low spawn probability - expected mature wait t0 is very large (~{t0:.2f} hours)"
-        )
+    v_net = v - per_harvest_cost
+    v_boost_net = v_boost - per_harvest_cost
 
-    rate_ready = N / t0
-    revenue_hr_ready = rate_ready * v
-    profit_hr_ready = revenue_hr_ready - (rate_ready * c)
+    harvests_per_hour = N / hours_per_harvest_per_spot
+    harvests_per_cycle = N / cycles_per_harvest_per_spot
+    profit_per_hour = harvests_per_hour * v_net
+    profit_per_cycle = harvests_per_cycle * v_net
 
-    N = _finite_or_cap(N, warnings, "N")
-    t0 = _finite_or_cap(t0, warnings, "t0")
-    rate_ready = _finite_or_cap(rate_ready, warnings, "rate_ready")
-    revenue_hr_ready = _finite_or_cap(revenue_hr_ready, warnings, "revenue_hr_ready")
-    profit_hr_ready = _finite_or_cap(profit_hr_ready, warnings, "profit_hr_ready")
+    N = _ensure_finite(N, "N")
+    cycles_per_harvest_per_spot = _ensure_finite(cycles_per_harvest_per_spot, "cycles_per_harvest_per_spot")
+    hours_per_harvest_per_spot = _ensure_finite(hours_per_harvest_per_spot, "hours_per_harvest_per_spot")
+    harvests_per_hour = _ensure_finite(harvests_per_hour, "harvests_per_hour")
+    harvests_per_cycle = _ensure_finite(harvests_per_cycle, "harvests_per_cycle")
+    profit_per_hour = _ensure_finite(profit_per_hour, "profit_per_hour")
+    profit_per_cycle = _ensure_finite(profit_per_cycle, "profit_per_cycle")
 
-    w_out: float | None = None
-    teff_out: float | None = None
-    rate_batch_out: float | None = None
-    revenue_hr_batch_out: float | None = None
-    boost_cost_hr_out: float | None = None
-    profit_hr_batch_out: float | None = None
-    batch: Dict[str, Any]
     if H > 0.0:
         w = H / 2.0
-        teff = t0 + w
-        if teff <= 0.0:
-            raise ValueError("teff must be > 0")
-
-        rate_batch = N / teff
-        revenue_hr_batch = rate_batch * v_boost
+        teff = hours_per_harvest_per_spot + w
+        harvests_per_hour_batch = N / teff
+        harvests_per_cycle_batch = harvests_per_hour_batch * tau
         boost_cost_hr = B / H
-        profit_hr_batch = revenue_hr_batch - boost_cost_hr
+        profit_per_hour_batch = (harvests_per_hour_batch * v_boost_net) - boost_cost_hr
+        profit_per_cycle_batch = profit_per_hour_batch * tau
 
-        w_out = _finite_or_cap(w, warnings, "w")
-        teff_out = _finite_or_cap(teff, warnings, "teff")
-        rate_batch_out = _finite_or_cap(rate_batch, warnings, "rate_batch")
-        revenue_hr_batch_out = _finite_or_cap(revenue_hr_batch, warnings, "revenue_hr_batch")
-        boost_cost_hr_out = _finite_or_cap(boost_cost_hr, warnings, "boost_cost_hr")
-        profit_hr_batch_out = _finite_or_cap(profit_hr_batch, warnings, "profit_hr_batch")
-
-        batch = {
-            "H": _finite_or_cap(H, warnings, "H"),
-            "w": w_out,
-            "teff": teff_out,
-            "rate_batch": rate_batch_out,
-            "revenue_hr_batch": revenue_hr_batch_out,
-            "boost_cost_hr": boost_cost_hr_out,
-            "profit_hr_batch": profit_hr_batch_out,
+        batch: Dict[str, Any] = {
+            "H": _ensure_finite(H, "H"),
+            "w": _ensure_finite(w, "w"),
+            "teff_hours": _ensure_finite(teff, "teff_hours"),
+            "harvests_per_hour_batch": _ensure_finite(harvests_per_hour_batch, "harvests_per_hour_batch"),
+            "harvests_per_cycle_batch": _ensure_finite(harvests_per_cycle_batch, "harvests_per_cycle_batch"),
+            "boost_cost_hr": _ensure_finite(boost_cost_hr, "boost_cost_hr"),
+            "profit_per_hour_batch": _ensure_finite(profit_per_hour_batch, "profit_per_hour_batch"),
+            "profit_per_cycle_batch": _ensure_finite(profit_per_cycle_batch, "profit_per_cycle_batch"),
         }
     else:
         batch = {
             "H": None,
             "w": None,
-            "teff": None,
-            "rate_batch": None,
-            "revenue_hr_batch": None,
+            "teff_hours": None,
+            "harvests_per_hour_batch": None,
+            "harvests_per_cycle_batch": None,
             "boost_cost_hr": None,
-            "profit_hr_batch": None,
+            "profit_per_hour_batch": None,
+            "profit_per_cycle_batch": None,
         }
 
     return {
+        "tau_hours": _ensure_finite(tau, "tau_hours"),
+        "p": _ensure_finite(p, "p"),
+        "g": float(g),
         "N": N,
-        "t0": t0,
-        "rate_ready": rate_ready,
-        "revenue_hr_ready": revenue_hr_ready,
-        "profit_hr_ready": profit_hr_ready,
-        "teff": teff_out,
-        "rate_batch": rate_batch_out,
-        "revenue_hr_batch": revenue_hr_batch_out,
-        "boost_cost_hr": boost_cost_hr_out,
-        "profit_hr_batch": profit_hr_batch_out,
-        "warning": warnings[0] if warnings else None,
+        "cycles_per_harvest_per_spot": cycles_per_harvest_per_spot,
+        "hours_per_harvest_per_spot": hours_per_harvest_per_spot,
+        "harvests_per_cycle": harvests_per_cycle,
+        "harvests_per_hour": harvests_per_hour,
+        "profit_per_cycle": profit_per_cycle,
+        "profit_per_hour": profit_per_hour,
+        "v_net": _ensure_finite(v_net, "v_net"),
         "batch": batch,
         "warnings": warnings,
     }

@@ -183,19 +183,19 @@ class LeaderboardTests(unittest.TestCase):
         expected = compute_profit_rates({
             "m": plots,
             "x": lonelily["breakdown"]["base_limit"],
-            "p": lonelily["hourly"]["mutation_chance"],
+            "p": lonelily["hourly"]["p"],
             "tau": cycle_time_hours,
-            "k": lonelily["breakdown"]["growth_stages"],
+            "g": lonelily["breakdown"]["growth_stages"],
             "v": lonelily["mut_price"],
             "v_boost": 120.0,
             "B": 1000.0,
             "H": 24.0,
-            "c": 5.0,
+            "per_harvest_cost": 5.0,
         })
 
-        self.assertAlmostEqual(lonelily["hourly"]["profit_per_hour_ready"], expected["profit_hr_ready"], places=6)
-        self.assertAlmostEqual(lonelily["hourly"]["profit_per_hour_batch"], expected["profit_hr_batch"], places=6)
-        self.assertAlmostEqual(lonelily["hourly"]["profit_per_hour_selected"], expected["profit_hr_ready"], places=6)
+        self.assertAlmostEqual(lonelily["hourly"]["profit_per_hour_ready"], expected["profit_per_hour"], places=6)
+        self.assertAlmostEqual(lonelily["hourly"]["profit_per_hour_batch"], expected["batch"]["profit_per_hour_batch"], places=6)
+        self.assertAlmostEqual(lonelily["hourly"]["profit_per_hour_selected"], expected["profit_per_hour"], places=6)
 
 
 if __name__ == "__main__":

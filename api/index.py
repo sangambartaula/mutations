@@ -282,10 +282,8 @@ def get_leaderboard(
         profit_per_cycle = (profit_batch / growth_stages) if growth_stages > 0 else 0.0
         profit_per_hour = (profit_batch / estimated_time) if estimated_time > 0 else 0.0
 
-        # Growth-stage mapping assumption from product requirements:
-        # growth_stages is already the number of full cycles AFTER hatch/spawn to maturity.
-        # Therefore k = growth_stages exactly.
-        k_after_spawn = growth_stages
+        # Growth-stage mapping from product requirements:
+        # growth_stages is cycles AFTER spawn until harvestable, so g = growth_stages exactly.
         per_mut_boost_price = float(boosted_value_override) if boosted_value_override is not None else mut_sell_price_value
         try:
             profit_models = compute_profit_rates({
@@ -293,40 +291,41 @@ def get_leaderboard(
                 "x": int(base_limit),
                 "p": mutation_chance_effective,
                 "tau": cycle_time_hours,
-                "k": k_after_spawn,
+                "g": growth_stages,
                 "v": mut_sell_price_value,
                 "v_boost": per_mut_boost_price,
                 "B": boost_cost,
                 "H": batch_hours,
-                "c": per_harvest_cost,
+                "per_harvest_cost": per_harvest_cost,
             })
         except ValueError as exc:
             # Keep API resilient per mutation and surface validation context in warnings.
             profit_models = {
+                "tau_hours": cycle_time_hours,
+                "p": mutation_chance_effective,
+                "g": float(growth_stages),
                 "N": None,
-                "t0": None,
-                "rate_ready": None,
-                "revenue_hr_ready": None,
-                "profit_hr_ready": None,
+                "cycles_per_harvest_per_spot": None,
+                "hours_per_harvest_per_spot": None,
+                "harvests_per_cycle": None,
+                "harvests_per_hour": None,
+                "profit_per_cycle": None,
+                "profit_per_hour": None,
+                "v_net": None,
                 "batch": {
                     "H": None,
                     "w": None,
-                    "teff": None,
-                    "rate_batch": None,
-                    "revenue_hr_batch": None,
+                    "teff_hours": None,
+                    "harvests_per_hour_batch": None,
+                    "harvests_per_cycle_batch": None,
                     "boost_cost_hr": None,
-                    "profit_hr_batch": None,
+                    "profit_per_hour_batch": None,
+                    "profit_per_cycle_batch": None,
                 },
-                "teff": None,
-                "rate_batch": None,
-                "revenue_hr_batch": None,
-                "boost_cost_hr": None,
-                "profit_hr_batch": None,
-                "warning": f"profit model error: {exc}",
                 "warnings": [f"profit model error: {exc}"],
             }
-        hourly_profit_ready = profit_models.get("profit_hr_ready")
-        hourly_profit_batch = profit_models.get("profit_hr_batch")
+        hourly_profit_ready = profit_models.get("profit_per_hour")
+        hourly_profit_batch = profit_models.get("batch", {}).get("profit_per_hour_batch")
         if harvest_strategy == "batch" and hourly_profit_batch is not None:
             hourly_profit_selected = hourly_profit_batch
         else:
@@ -380,10 +379,20 @@ def get_leaderboard(
                 "profit_per_hour_selected": hourly_profit_selected,
                 "profit_per_hour_ready": hourly_profit_ready,
                 "profit_per_hour_batch": hourly_profit_batch,
-                "rate_ready": profit_models.get("rate_ready"),
-                "rate_batch": profit_models.get("rate_batch"),
-                "t0_hours": profit_models.get("t0"),
-                "teff_hours": profit_models.get("teff"),
+                "tau_hours": profit_models.get("tau_hours"),
+                "p": profit_models.get("p"),
+                "g": profit_models.get("g"),
+                "N": profit_models.get("N"),
+                "cycles_per_harvest_per_spot": profit_models.get("cycles_per_harvest_per_spot"),
+                "hours_per_harvest_per_spot": profit_models.get("hours_per_harvest_per_spot"),
+                "harvests_per_cycle": profit_models.get("harvests_per_cycle"),
+                "harvests_per_hour": profit_models.get("harvests_per_hour"),
+                "profit_per_cycle": profit_models.get("profit_per_cycle"),
+                "profit_per_hour": profit_models.get("profit_per_hour"),
+                "rate_ready": profit_models.get("harvests_per_hour"),
+                "rate_batch": profit_models.get("batch", {}).get("harvests_per_hour_batch"),
+                "t0_hours": profit_models.get("hours_per_harvest_per_spot"),
+                "teff_hours": profit_models.get("batch", {}).get("teff_hours"),
                 "warnings": profit_models.get("warnings", []),
                 "batch": profit_models.get("batch", {}),
                 "payback_hours_ready": payback_hours_ready,

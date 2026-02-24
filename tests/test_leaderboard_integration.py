@@ -31,12 +31,36 @@ def test_leaderboard_exposes_profit_models_and_no_nan(_mock_prices):
     pm = sample.get("profit_models")
     assert pm is not None
 
-    for key in ["N", "t0", "rate_ready", "revenue_hr_ready", "profit_hr_ready", "batch", "warnings"]:
+    for key in [
+        "tau_hours",
+        "p",
+        "g",
+        "N",
+        "cycles_per_harvest_per_spot",
+        "hours_per_harvest_per_spot",
+        "harvests_per_cycle",
+        "harvests_per_hour",
+        "profit_per_cycle",
+        "profit_per_hour",
+        "batch",
+        "warnings",
+    ]:
         assert key in pm
 
-    for key in ["N", "t0", "rate_ready", "revenue_hr_ready", "profit_hr_ready"]:
+    for key in [
+        "tau_hours",
+        "p",
+        "g",
+        "N",
+        "cycles_per_harvest_per_spot",
+        "hours_per_harvest_per_spot",
+        "harvests_per_cycle",
+        "harvests_per_hour",
+        "profit_per_cycle",
+        "profit_per_hour",
+    ]:
         assert math.isfinite(pm[key])
 
-    for key in ["H", "w", "teff", "rate_batch", "revenue_hr_batch", "boost_cost_hr", "profit_hr_batch"]:
+    for key in ["H", "w", "teff_hours", "harvests_per_hour_batch", "harvests_per_cycle_batch", "boost_cost_hr", "profit_per_hour_batch", "profit_per_cycle_batch"]:
         assert key in pm["batch"]
         assert pm["batch"][key] is None or math.isfinite(pm["batch"][key])
