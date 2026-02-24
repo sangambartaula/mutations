@@ -2,8 +2,14 @@ import csv
 import io
 import os
 import json
-from fastapi import FastAPI, Query
-from typing import Dict, Any
+import time
+from collections import defaultdict, deque
+from threading import Lock
+from typing import Dict, Any, Deque, List
+
+from fastapi import FastAPI, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from mut_calc import compute_profit_rates
 
@@ -13,6 +19,113 @@ except ImportError:
     from shared_data import NPC_PRICES, get_bazaar_prices, csv_data, DEFAULT_REQS
 
 app = FastAPI(title="Skyblock Mutations API")
+
+
+def _allowed_origins_from_env() -> List[str]:
+    raw_origins = os.getenv("ALLOWED_ORIGINS", "").strip()
+    origins: List[str] = []
+    if raw_origins:
+        origins.extend([o.strip() for o in raw_origins.split(",") if o.strip()])
+    else:
+        origins.extend([
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+        ])
+
+    frontend_url = os.getenv("FRONTEND_URL", "").strip()
+    if frontend_url:
+        origins.append(frontend_url)
+
+    vercel_url = os.getenv("VERCEL_URL", "").strip()
+    if vercel_url:
+        origins.append(f"https://{vercel_url}")
+
+    # Preserve order while de-duplicating.
+    deduped: List[str] = []
+    seen = set()
+    for origin in origins:
+        if origin not in seen:
+            seen.add(origin)
+            deduped.append(origin)
+    return deduped
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_allowed_origins_from_env(),
+    allow_credentials=False,
+    allow_methods=["GET", "OPTIONS"],
+    allow_headers=["*"],
+)
+
+RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60"))
+RATE_LIMIT_MAX_REQUESTS = int(os.getenv("RATE_LIMIT_MAX_REQUESTS", "120"))
+_rate_limit_buckets: Dict[str, Deque[float]] = defaultdict(deque)
+_rate_limit_lock = Lock()
+
+
+def _client_ip_from_request(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if forwarded:
+        # First IP in the chain is the original client.
+        return forwarded.split(",")[0].strip() or "unknown"
+    if request.client and request.client.host:
+        return request.client.host
+    return "unknown"
+
+
+@app.middleware("http")
+async def _rate_limit_leaderboard(request: Request, call_next):
+    if request.url.path == "/api/leaderboard":
+        client_ip = _client_ip_from_request(request)
+        now = time.monotonic()
+        with _rate_limit_lock:
+            bucket = _rate_limit_buckets[client_ip]
+            cutoff = now - RATE_LIMIT_WINDOW_SECONDS
+            while bucket and bucket[0] < cutoff:
+                bucket.popleft()
+            if len(bucket) >= RATE_LIMIT_MAX_REQUESTS:
+                return JSONResponse(
+                    status_code=429,
+                    content={"detail": "Rate limit exceeded. Try again shortly."},
+                    headers={
+                        "Retry-After": str(RATE_LIMIT_WINDOW_SECONDS),
+                        "X-RateLimit-Limit": str(RATE_LIMIT_MAX_REQUESTS),
+                        "X-RateLimit-Window": str(RATE_LIMIT_WINDOW_SECONDS),
+                    },
+                )
+            bucket.append(now)
+
+    response = await call_next(request)
+    if request.url.path == "/api/leaderboard":
+        response.headers["X-RateLimit-Limit"] = str(RATE_LIMIT_MAX_REQUESTS)
+        response.headers["X-RateLimit-Window"] = str(RATE_LIMIT_WINDOW_SECONDS)
+    return response
+
+
+@app.middleware("http")
+async def _security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+    response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "img-src 'self' data: https:; "
+        "style-src 'self' 'unsafe-inline'; "
+        "script-src 'self'; "
+        "connect-src 'self' https:; "
+        "object-src 'none'; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self'"
+    )
+    # HSTS is ignored by browsers on HTTP; safe to set globally.
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
 
 # Load manual data
 MANUAL_DATA = {}
@@ -64,6 +177,7 @@ def get_leaderboard(
     harvest_harbinger: bool = Query(False),
     infini_vacuum: bool = Query(False),
     dark_cacao: bool = Query(False),
+    improved_harvest_boost: bool = Query(True),
     hypercharge_level: int = Query(0, ge=0, le=20),
     per_harvest_cost: float = Query(0.0, ge=0.0),
 ) -> Dict[str, Any]:
@@ -112,7 +226,7 @@ def get_leaderboard(
     total_bonus = unaffected_bonus + (affected_bonus_base * affected_multiplier)
     effective_fortune = fortune + total_bonus
 
-    wart_buff = 1.3
+    wart_buff = 1.3 if improved_harvest_boost else 1.0
     fortune_mult = ((effective_fortune / 100) + 1)
     
     calc_mult = additive_base * wart_buff * fortune_mult

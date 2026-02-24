@@ -107,6 +107,7 @@ const toMutationIconPath = (mutationName: string) =>
 export default function Home() {
   const [plots, setPlots] = useState(3);
   const [fortune, setFortune] = useState(2500);
+  const [useImprovedHarvestBoost, setUseImprovedHarvestBoost] = useState(true);
   const [useHarvestHarbinger, setUseHarvestHarbinger] = useState(false);
   const [useInfiniVacuum, setUseInfiniVacuum] = useState(false);
   const [useDarkCacao, setUseDarkCacao] = useState(false);
@@ -167,6 +168,55 @@ export default function Home() {
   }, [maxedCrops]);
 
   useEffect(() => {
+    const saved = localStorage.getItem("mutations:settings");
+    if (!saved) return;
+    try {
+      const parsed = JSON.parse(saved) as Record<string, unknown>;
+      if (typeof parsed.plots === "number") setPlots(Math.max(1, Math.min(3, parsed.plots)));
+      if (typeof parsed.fortune === "number") setFortune(Math.max(0, Math.min(4000, parsed.fortune)));
+      if (typeof parsed.useImprovedHarvestBoost === "boolean") setUseImprovedHarvestBoost(parsed.useImprovedHarvestBoost);
+      if (typeof parsed.useHarvestHarbinger === "boolean") setUseHarvestHarbinger(parsed.useHarvestHarbinger);
+      if (typeof parsed.useInfiniVacuum === "boolean") setUseInfiniVacuum(parsed.useInfiniVacuum);
+      if (typeof parsed.useDarkCacao === "boolean") setUseDarkCacao(parsed.useDarkCacao);
+      if (typeof parsed.hyperchargeLevel === "number") setHyperchargeLevel(Math.max(0, Math.min(20, parsed.hyperchargeLevel)));
+      if (typeof parsed.ghUpgrade === "number") setGhUpgrade(Math.max(0, Math.min(9, parsed.ghUpgrade)));
+      if (typeof parsed.uniqueCrops === "number") setUniqueCrops(Math.max(0, Math.min(12, parsed.uniqueCrops)));
+      if (parsed.setupMode === "buy_order" || parsed.setupMode === "insta_buy") setSetupMode(parsed.setupMode);
+      if (parsed.sellMode === "sell_offer" || parsed.sellMode === "insta_sell") setSellMode(parsed.sellMode);
+    } catch {
+      // Ignore malformed local storage data.
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("mutations:settings", JSON.stringify({
+      plots,
+      fortune,
+      useImprovedHarvestBoost,
+      useHarvestHarbinger,
+      useInfiniVacuum,
+      useDarkCacao,
+      hyperchargeLevel,
+      ghUpgrade,
+      uniqueCrops,
+      setupMode,
+      sellMode,
+    }));
+  }, [
+    plots,
+    fortune,
+    useImprovedHarvestBoost,
+    useHarvestHarbinger,
+    useInfiniVacuum,
+    useDarkCacao,
+    hyperchargeLevel,
+    ghUpgrade,
+    uniqueCrops,
+    setupMode,
+    sellMode,
+  ]);
+
+  useEffect(() => {
     async function fetchData() {
       setLoading(true);
       setError("");
@@ -174,6 +224,7 @@ export default function Home() {
         const query = new URLSearchParams({
           plots: plots.toString(),
           fortune: fortune.toString(),
+          improved_harvest_boost: useImprovedHarvestBoost ? "true" : "false",
           harvest_harbinger: useHarvestHarbinger ? "true" : "false",
           infini_vacuum: useInfiniVacuum ? "true" : "false",
           dark_cacao: useDarkCacao ? "true" : "false",
@@ -201,6 +252,7 @@ export default function Home() {
   }, [
     plots,
     fortune,
+    useImprovedHarvestBoost,
     useHarvestHarbinger,
     useInfiniVacuum,
     useDarkCacao,
@@ -488,6 +540,13 @@ export default function Home() {
 
             <div className="mb-6 rounded-xl border border-neutral-200 dark:border-neutral-800 p-3 space-y-3">
               <p className="text-sm font-medium">Fortune Buffs</p>
+
+              <label className="flex items-center justify-between gap-3">
+                <span className="inline-flex items-center gap-2 text-xs">
+                  Improved Harvest Boost (+30% crop yield)
+                </span>
+                <input type="checkbox" checked={useImprovedHarvestBoost} onChange={(e) => setUseImprovedHarvestBoost(e.target.checked)} className="accent-emerald-500" />
+              </label>
 
               <label className="flex items-center justify-between gap-3">
                 <span className="inline-flex items-center gap-2 text-xs">
@@ -812,7 +871,7 @@ export default function Home() {
           </div>
 
           <div className="rounded-xl border border-amber-200/70 bg-amber-50/80 px-4 py-3 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
-            Expected values use the global growth-cycle model from the API. Results are based on community-tested assumptions; verify key values in-game before large orders.
+            Results are based on community-tested assumptions; verify key values in-game before large orders.
           </div>
         </main>
       </div>
