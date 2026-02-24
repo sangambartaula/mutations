@@ -148,16 +148,16 @@ export default function Home() {
   ];
   const tableScrollRef = useRef<HTMLDivElement | null>(null);
   const lastLeaderboardQueryRef = useRef<string | null>(null);
+  const activeLeaderboardRequestRef = useRef(0);
 
   const [data, setData] = useState<LeaderboardResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [settingsHydrated, setSettingsHydrated] = useState(false);
-  const [cropsHydrated, setCropsHydrated] = useState(false);
+  const maxedCropsQuery = useMemo(() => maxedCrops.join(","), [maxedCrops]);
 
   useEffect(() => {
-    const saved = localStorage.getItem("mutations:maxed-crops");
     try {
+      const saved = localStorage.getItem("mutations:maxed-crops");
       if (saved) {
         const parsed: unknown = JSON.parse(saved);
         if (Array.isArray(parsed)) {
@@ -166,19 +166,20 @@ export default function Home() {
       }
     } catch {
       // Ignore malformed local storage data.
-    } finally {
-      setCropsHydrated(true);
     }
   }, []);
 
   useEffect(() => {
-    if (!cropsHydrated) return;
-    localStorage.setItem("mutations:maxed-crops", JSON.stringify(maxedCrops));
-  }, [maxedCrops, cropsHydrated]);
+    try {
+      localStorage.setItem("mutations:maxed-crops", JSON.stringify(maxedCrops));
+    } catch {
+      // Ignore local storage write failures.
+    }
+  }, [maxedCrops]);
 
   useEffect(() => {
-    const saved = localStorage.getItem("mutations:settings");
     try {
+      const saved = localStorage.getItem("mutations:settings");
       if (saved) {
         const parsed = JSON.parse(saved) as Record<string, unknown>;
         if (typeof parsed.plots === "number") setPlots(Math.max(1, Math.min(3, parsed.plots)));
@@ -195,28 +196,28 @@ export default function Home() {
       }
     } catch {
       // Ignore malformed local storage data.
-    } finally {
-      setSettingsHydrated(true);
     }
   }, []);
 
   useEffect(() => {
-    if (!settingsHydrated) return;
-    localStorage.setItem("mutations:settings", JSON.stringify({
-      plots,
-      fortune,
-      useImprovedHarvestBoost,
-      useHarvestHarbinger,
-      useInfiniVacuum,
-      useDarkCacao,
-      hyperchargeLevel,
-      ghUpgrade,
-      uniqueCrops,
-      setupMode,
-      sellMode,
-    }));
+    try {
+      localStorage.setItem("mutations:settings", JSON.stringify({
+        plots,
+        fortune,
+        useImprovedHarvestBoost,
+        useHarvestHarbinger,
+        useInfiniVacuum,
+        useDarkCacao,
+        hyperchargeLevel,
+        ghUpgrade,
+        uniqueCrops,
+        setupMode,
+        sellMode,
+      }));
+    } catch {
+      // Ignore local storage write failures.
+    }
   }, [
-    settingsHydrated,
     plots,
     fortune,
     useImprovedHarvestBoost,
@@ -231,9 +232,9 @@ export default function Home() {
   ]);
 
   useEffect(() => {
-    if (!settingsHydrated || !cropsHydrated) return;
-
-    async function fetchData() {
+    let cancelled = false;
+    const controller = new AbortController();
+    const debounceHandle = window.setTimeout(async () => {
       const query = new URLSearchParams({
         plots: plots.toString(),
         fortune: fortune.toString(),
@@ -247,27 +248,42 @@ export default function Home() {
         mode: mode,
         setup_mode: setupMode,
         sell_mode: sellMode,
-        maxed_crops: maxedCrops.join(","),
+        maxed_crops: maxedCropsQuery,
         ...(mode === "target" && { target_crop: targetCrop })
       });
       const queryString = query.toString();
       if (lastLeaderboardQueryRef.current === queryString) return;
-      lastLeaderboardQueryRef.current = queryString;
+      const requestId = activeLeaderboardRequestRef.current + 1;
+      activeLeaderboardRequestRef.current = requestId;
 
       setLoading(true);
       setError("");
       try {
-        const res = await fetch(`/api/leaderboard?${queryString}&t=${Date.now()}`, { cache: "no-store" });
+        const res = await fetch(`/api/leaderboard?${queryString}&t=${Date.now()}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
         if (!res.ok) throw new Error("Failed to fetch leaderboard data.");
         const json: LeaderboardResponse = await res.json();
+        if (cancelled) return;
         setData(json);
+        lastLeaderboardQueryRef.current = queryString;
       } catch (err: unknown) {
+        if ((err as Error)?.name === "AbortError") return;
+        if (cancelled) return;
         setError(err instanceof Error ? err.message : "Unexpected error while fetching leaderboard data.");
       } finally {
-        setLoading(false);
+        if (requestId === activeLeaderboardRequestRef.current) {
+          setLoading(false);
+        }
       }
-    }
-    fetchData();
+    }, 120);
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      window.clearTimeout(debounceHandle);
+    };
   }, [
     plots,
     fortune,
@@ -282,9 +298,7 @@ export default function Home() {
     setupMode,
     sellMode,
     targetCrop,
-    maxedCrops,
-    settingsHydrated,
-    cropsHydrated,
+    maxedCropsQuery,
   ]);
 
   const toggleMaxedCrop = (crop: string) => {
