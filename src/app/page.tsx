@@ -484,7 +484,7 @@ export default function Home() {
               <label className="flex items-center justify-between gap-3">
                 <span className="inline-flex items-center gap-2 text-xs">
                   <Image src="/icons/buffs/infini-vacuum-hooverius.png" alt="InfiniVacuum Hooverius" width={20} height={20} className="w-5 h-5 rounded-sm" />
-                  InfiniVacuum Hooverius (+200, affected)
+                  Pest Buff (+200)
                 </span>
                 <input type="checkbox" checked={useInfiniVacuum} onChange={(e) => setUseInfiniVacuum(e.target.checked)} className="accent-emerald-500" />
               </label>

@@ -1,6 +1,5 @@
 import csv
 import io
-import math
 import os
 import json
 from fastapi import FastAPI, Query
@@ -66,9 +65,11 @@ def get_leaderboard(
     infini_vacuum: bool = Query(False),
     dark_cacao: bool = Query(False),
     hypercharge_level: int = Query(0, ge=0, le=20),
-    batch_interval_hours: float = Query(0.0, ge=0.0),
+    harvest_strategy: str = Query("ready"),  # "ready" | "batch"
+    batch_hours: float = Query(0.0, ge=0.0),
     boost_cost: float = Query(0.0, ge=0.0),
-    boosted_mut_price: Optional[float] = Query(None),
+    boosted_value_override: Optional[float] = Query(None),
+    per_harvest_cost: float = Query(0.0, ge=0.0),
 ) -> Dict[str, Any]:
     # Normalize FastAPI Query defaults when function is called directly in tests/scripts.
     if not isinstance(maxed_crops, str):
@@ -81,12 +82,19 @@ def get_leaderboard(
         custom_time_hours = 24.0
     if not isinstance(hypercharge_level, int):
         hypercharge_level = 0
-    if not isinstance(batch_interval_hours, (int, float)):
-        batch_interval_hours = 0.0
+    if not isinstance(harvest_strategy, str):
+        harvest_strategy = "ready"
+    if not isinstance(batch_hours, (int, float)):
+        batch_hours = 0.0
     if not isinstance(boost_cost, (int, float)):
         boost_cost = 0.0
-    if boosted_mut_price is not None and not isinstance(boosted_mut_price, (int, float)):
-        boosted_mut_price = None
+    if boosted_value_override is not None and not isinstance(boosted_value_override, (int, float)):
+        boosted_value_override = None
+    if not isinstance(per_harvest_cost, (int, float)):
+        per_harvest_cost = 0.0
+    harvest_strategy = harvest_strategy.lower().strip()
+    if harvest_strategy not in {"ready", "batch"}:
+        harvest_strategy = "ready"
     
     # Load Data
     bazaar_data = get_bazaar_prices()
@@ -274,11 +282,11 @@ def get_leaderboard(
         profit_per_cycle = (profit_batch / growth_stages) if growth_stages > 0 else 0.0
         profit_per_hour = (profit_batch / estimated_time) if estimated_time > 0 else 0.0
 
-        # Growth-stage mapping assumption:
-        # spawn rolls happen every cycle; once a mutation spawns, it needs k extra cycles to mature.
-        # Our data stores total growth_stages for maturity, so k = max(0, growth_stages - 1).
-        k_after_spawn = max(0, growth_stages - 1)
-        per_mut_boost_price = float(boosted_mut_price) if boosted_mut_price is not None else mut_sell_price_value
+        # Growth-stage mapping assumption from product requirements:
+        # growth_stages is already the number of full cycles AFTER hatch/spawn to maturity.
+        # Therefore k = growth_stages exactly.
+        k_after_spawn = growth_stages
+        per_mut_boost_price = float(boosted_value_override) if boosted_value_override is not None else mut_sell_price_value
         try:
             profit_models = compute_profit_rates({
                 "m": plots,
@@ -289,7 +297,8 @@ def get_leaderboard(
                 "v": mut_sell_price_value,
                 "v_boost": per_mut_boost_price,
                 "B": boost_cost,
-                "H": batch_interval_hours,
+                "H": batch_hours,
+                "c": per_harvest_cost,
             })
         except ValueError as exc:
             # Keep API resilient per mutation and surface validation context in warnings.
@@ -308,26 +317,23 @@ def get_leaderboard(
                     "boost_cost_hr": None,
                     "profit_hr_batch": None,
                 },
+                "teff": None,
+                "rate_batch": None,
+                "revenue_hr_batch": None,
+                "boost_cost_hr": None,
+                "profit_hr_batch": None,
+                "warning": f"profit model error: {exc}",
                 "warnings": [f"profit model error: {exc}"],
             }
-
-        # Deterministic expected-value model for mutation-spawn profitability over time.
-        if harvest_mode == "custom_time":
-            harvest_time_hours = custom_time_hours
-            completed_cycles = int(harvest_time_hours // cycle_time_hours) if cycle_time_hours > 0 else 0
+        hourly_profit_ready = profit_models.get("profit_hr_ready")
+        hourly_profit_batch = profit_models.get("profit_hr_batch")
+        if harvest_strategy == "batch" and hourly_profit_batch is not None:
+            hourly_profit_selected = hourly_profit_batch
         else:
-            if base_limit > 1 and mutation_chance_effective < 1:
-                t_cycles = math.log(1.0 / base_limit) / math.log(1.0 - mutation_chance_effective)
-            else:
-                t_cycles = 1.0
-            harvest_time_hours = max(cycle_time_hours, t_cycles * cycle_time_hours)
-            completed_cycles = int(harvest_time_hours // cycle_time_hours) if cycle_time_hours > 0 else 0
+            hourly_profit_selected = hourly_profit_ready
 
-        expected_mutations_per_plot = base_limit * (1.0 - ((1.0 - mutation_chance_effective) ** completed_cycles))
-        expected_total_mutations = plots * expected_mutations_per_plot
-        expected_mutation_revenue = expected_total_mutations * mut_sell_price_value
-        expected_profit = expected_mutation_revenue - opt_cost
-        expected_profit_per_hour = (expected_profit / harvest_time_hours) if harvest_time_hours > 0 else 0.0
+        payback_hours_ready = (opt_cost / hourly_profit_ready) if (hourly_profit_ready is not None and hourly_profit_ready > 0) else None
+        payback_hours_batch = (opt_cost / hourly_profit_batch) if (hourly_profit_batch is not None and hourly_profit_batch > 0) else None
         
         # 4. Scoring Logic
         score = 0
@@ -344,7 +350,7 @@ def get_leaderboard(
             if score <= 0:
                 continue
         elif mode == "hourly":
-            score = expected_profit_per_hour
+            score = hourly_profit_selected if hourly_profit_selected is not None else float("-inf")
             
         breakdown = {
             "base_limit": base_limit,
@@ -370,14 +376,27 @@ def get_leaderboard(
             "smart_progress": smart_progress,
             "hourly": {
                 "mutation_chance": mutation_chance_effective,
+                "strategy": harvest_strategy,
+                "profit_per_hour_selected": hourly_profit_selected,
+                "profit_per_hour_ready": hourly_profit_ready,
+                "profit_per_hour_batch": hourly_profit_batch,
+                "rate_ready": profit_models.get("rate_ready"),
+                "rate_batch": profit_models.get("rate_batch"),
+                "t0_hours": profit_models.get("t0"),
+                "teff_hours": profit_models.get("teff"),
+                "warnings": profit_models.get("warnings", []),
+                "batch": profit_models.get("batch", {}),
+                "payback_hours_ready": payback_hours_ready,
+                "payback_hours_batch": payback_hours_batch,
+                # Legacy fields retained for backward compatibility:
                 "harvest_mode": harvest_mode,
                 "custom_time_hours": custom_time_hours if harvest_mode == "custom_time" else None,
-                "harvest_time_hours": harvest_time_hours,
-                "completed_cycles": completed_cycles,
-                "expected_mutations": expected_total_mutations,
-                "expected_revenue": expected_mutation_revenue,
-                "expected_profit": expected_profit,
-                "expected_profit_per_hour": expected_profit_per_hour
+                "harvest_time_hours": None,
+                "completed_cycles": None,
+                "expected_mutations": None,
+                "expected_revenue": None,
+                "expected_profit": None,
+                "expected_profit_per_hour": hourly_profit_selected,
             },
             "profit_models": profit_models,
             "breakdown": breakdown

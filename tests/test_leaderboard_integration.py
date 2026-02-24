@@ -17,9 +17,11 @@ def test_leaderboard_exposes_profit_models_and_no_nan(_mock_prices):
         target_crop=None,
         maxed_crops="",
         mutation_chance=0.0002,
-        batch_interval_hours=24.0,
+        harvest_strategy="batch",
+        batch_hours=24.0,
         boost_cost=100000.0,
-        boosted_mut_price=1200.0,
+        boosted_value_override=1200.0,
+        per_harvest_cost=0.0,
     )
 
     assert "leaderboard" in result
