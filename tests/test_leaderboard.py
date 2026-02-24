@@ -1,15 +1,63 @@
 import unittest
+import math
 from unittest.mock import patch
 
 from api.index import (
     DEFAULT_SPECIAL_MULTIPLIER_BY_MUTATION,
     MANUAL_DATA,
+    compute_break_even_cycles,
+    format_break_even_cycles,
     get_leaderboard,
 )
 from mut_calc import compute_profit_rates
 
 
 class LeaderboardTests(unittest.TestCase):
+    def test_break_even_cycles_known_case(self):
+        cycles = compute_break_even_cycles(200_000.0, 10_000.0)
+        self.assertEqual(cycles, 20.0)
+        self.assertEqual(format_break_even_cycles(cycles), "20")
+
+    def test_break_even_cycles_non_positive_rate_is_never(self):
+        self.assertIsNone(compute_break_even_cycles(200_000.0, 0.0))
+        self.assertIsNone(compute_break_even_cycles(200_000.0, -1.0))
+        self.assertEqual(format_break_even_cycles(None), "Never")
+        self.assertEqual(format_break_even_cycles(0.0), "Never")
+        self.assertEqual(format_break_even_cycles(-2.0), "Never")
+
+    def test_break_even_cycles_non_finite_inputs_are_never(self):
+        self.assertIsNone(compute_break_even_cycles(float("nan"), 10_000.0))
+        self.assertIsNone(compute_break_even_cycles(200_000.0, float("nan")))
+        self.assertIsNone(compute_break_even_cycles(float("inf"), 10_000.0))
+        self.assertIsNone(compute_break_even_cycles(200_000.0, float("inf")))
+        self.assertEqual(format_break_even_cycles(float("nan")), "Never")
+        self.assertEqual(format_break_even_cycles(float("inf")), "Never")
+
+    @patch("api.index.get_bazaar_prices", return_value={})
+    def test_break_even_display_is_never_for_non_positive_cycle_value(self, _mock_prices):
+        result = get_leaderboard(
+            plots=3,
+            fortune=2500,
+            gh_upgrade=9,
+            unique_crops=12,
+            mode="profit",
+            setup_mode="buy_order",
+            sell_mode="sell_offer",
+            target_crop=None,
+            maxed_crops="",
+        )
+
+        checked_any = False
+        for mutation in result["leaderboard"]:
+            cycle_value = mutation["profit_per_cycle"]
+            if not math.isfinite(cycle_value) or cycle_value <= 0:
+                checked_any = True
+                self.assertEqual(mutation["break_even_cycles_display"], "Never")
+                self.assertIsNone(mutation["break_even_cycles"])
+
+        if not checked_any:
+            self.skipTest("No non-positive cycle values in fixture to validate 'Never' display.")
+
     @patch("api.index.get_bazaar_prices", return_value={})
     def test_mode_specific_fortune_buff_math(self, _mock_prices):
         result = get_leaderboard(
