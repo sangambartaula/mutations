@@ -8,7 +8,7 @@ import Image from "next/image";
 type OptimizationMode = "profit" | "smart" | "target";
 type SetupMode = "buy_order" | "insta_buy";
 type SellMode = "sell_offer" | "insta_sell";
-type SortKey = "rank" | "mutation" | "value" | "growth_cycle_profit" | "cycles" | "setup";
+type SortKey = "rank" | "mutation" | "value" | "growth_cycle_profit" | "profit_per_hour" | "cycles" | "setup";
 type SortDirection = "asc" | "desc";
 type ChipRarity = "rare" | "epic" | "legendary";
 
@@ -232,7 +232,6 @@ export default function Home() {
   const [mode, setMode] = useState<OptimizationMode>("profit");
   const [targetCrop, setTargetCrop] = useState("Wheat");
   const [maxedCrops, setMaxedCrops] = useState<string[]>([]);
-  const [smartTab, setSmartTab] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("rank");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
@@ -483,6 +482,20 @@ export default function Home() {
     );
   };
 
+  const markAllMissingAsCompleted = () => {
+    setMaxedCrops((prev) => {
+      const next = new Set(prev);
+      for (const crop of displayCrops) {
+        next.add(crop.key);
+      }
+      return displayCrops.map((crop) => crop.key).filter((crop) => next.has(crop));
+    });
+  };
+
+  const markAllAsMissing = () => {
+    setMaxedCrops([]);
+  };
+
   const formatCoins = (num: number) => {
     const safe = Number.isFinite(num) ? num : 0;
     return new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(safe);
@@ -606,20 +619,15 @@ export default function Home() {
     Boolean(math && ((math.evergreen_buff ?? 0) !== 0 || math.gh_buff !== 0 || math.unique_buff !== 0));
 
   const missingCrops = mode === "smart" ? (data?.metadata.missing_crops ?? []) : [];
-  const activeSmartTab = missingCrops.includes(smartTab) ? smartTab : "all";
-
-  const visibleSmartCrops = mode === "smart"
-    ? (activeSmartTab === "all" ? missingCrops : [activeSmartTab])
-    : [];
+  const visibleSmartCrops = mode === "smart" ? missingCrops : [];
 
   const visibleLeaderboard = useMemo(() => {
     if (!(mode === "smart" && data)) return data?.leaderboard ?? [];
     return data.leaderboard.filter((item) => {
       const progress = item.smart_progress ?? {};
-      if (activeSmartTab === "all") return Object.keys(progress).length > 0;
-      return (progress[activeSmartTab] ?? 0) > 0;
+      return Object.keys(progress).length > 0;
     });
-  }, [mode, data, activeSmartTab]);
+  }, [mode, data]);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -633,17 +641,14 @@ export default function Home() {
   const sortValue = (item: LeaderboardItem, key: SortKey) => {
     if (key === "mutation") return item.mutationName.toLowerCase();
     if (key === "growth_cycle_profit") return item.profit_per_growth_cycle ?? null;
+    if (key === "profit_per_hour") return item.profit_per_hour;
     if (key === "cycles") return item.hourly?.g ?? item.breakdown.growth_stages;
     if (key === "setup") return item.opt_cost;
     if (key === "value") {
       if (mode === "smart") {
-        if (activeSmartTab !== "all") return item.smart_progress?.[activeSmartTab] ?? 0;
         return item.score;
       }
       return mode === "target" ? item.score : item.profit;
-    }
-    if (mode === "smart" && activeSmartTab !== "all") {
-      return item.smart_progress?.[activeSmartTab] ?? 0;
     }
     return item.score;
   };
@@ -821,7 +826,7 @@ export default function Home() {
                 <div>
                   <label className="flex justify-between items-center text-sm font-medium mb-2">
                     <span className="inline-flex items-center gap-2">
-                      <Image src="/icons/settings/seeds.svg" alt="Seeds" width={20} height={20} className="w-5 h-5 rounded-md" />
+                      <Image src="/icons/settings/seeds.png" alt="Seeds" width={20} height={20} className="w-5 h-5 rounded-md object-contain pixelated" />
                       Unique Crops Placed
                     </span>
                     <span className="text-sky-600 dark:text-sky-400">{uniqueCrops}/12</span>
@@ -840,7 +845,7 @@ export default function Home() {
                   <label className="flex items-start justify-between gap-3">
                     <span className="min-w-0">
                       <span className="inline-flex items-center gap-2 text-sm font-medium text-neutral-800 dark:text-neutral-100">
-                        <Image src="/icons/settings/nether-wart.svg" alt="Nether Wart" width={20} height={20} className="w-5 h-5 rounded-md" />
+                        <Image src="/icons/settings/nether-wart.png" alt="Nether Wart" width={20} height={20} className="w-5 h-5 rounded-md object-contain pixelated" />
                         Improved Harvest Boost (Wart Buff)
                         <span className="group relative inline-flex">
                           <button
@@ -868,7 +873,7 @@ export default function Home() {
                 <div>
                   <label className="flex justify-between items-center text-sm font-medium mb-2">
                     <span className="inline-flex items-center gap-2">
-                      <Image src="/icons/settings/evergreen-chip.svg" alt="Evergreen Chip" width={20} height={20} className="w-5 h-5 rounded-md" />
+                      <Image src="/icons/settings/evergreen-chip.png" alt="Evergreen Chip" width={20} height={20} className="w-5 h-5 rounded-md object-contain pixelated" />
                       Evergreen Chip Level
                     </span>
                     <span className="text-teal-600 dark:text-teal-400">{evergreenChipLevel}/{chipRarityConfig[evergreenChipRarity].maxLevel}</span>
@@ -1002,7 +1007,7 @@ export default function Home() {
                   <div className="rounded-xl border border-neutral-200/80 bg-neutral-50/80 p-3 dark:border-neutral-800 dark:bg-neutral-950/40">
                     <label className="flex items-center justify-between text-xs mb-1">
                       <span className="inline-flex items-center gap-2">
-                        <Image src="/icons/settings/overdrive-chip.svg" alt="Overdrive Chip" width={20} height={20} className="w-5 h-5 rounded-sm" />
+                        <Image src="/icons/settings/overdrive-chip.png" alt="Overdrive Chip" width={20} height={20} className="w-5 h-5 rounded-sm object-contain pixelated" />
                         Overdrive Chip Level
                       </span>
                       <span className="text-orange-600 dark:text-orange-400">{overdriveChipLevel}/{chipRarityConfig[overdriveChipRarity].maxLevel}</span>
@@ -1094,40 +1099,21 @@ export default function Home() {
           {/* CROP MILESTONES SECTION */}
           {mode === "smart" && (
             <div className="bg-white dark:bg-neutral-900 rounded-2xl p-6 shadow-sm border border-neutral-200 dark:border-neutral-800">
-              <h2 className="text-lg font-semibold flex items-center gap-2 mb-4">
-                <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg">
-                  <ArrowUpRight className="w-4 h-4" />
-                </div>
-                Smart Milestones
-              </h2>
-              <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-4">
-                Missing milestone tabs and per-harvest progress. Maxed selections are saved locally.
-              </p>
-
-              <div className="flex flex-wrap gap-2 mb-5" role="tablist" aria-label="Missing milestones">
+              <div className="mb-5 flex flex-wrap gap-2">
                 <button
-                  role="tab"
-                  aria-selected={activeSmartTab === "all"}
-                  onClick={() => setSmartTab("all")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${activeSmartTab === "all"
-                    ? "bg-emerald-500 text-white border-emerald-500"
-                    : "bg-neutral-50 text-neutral-600 border-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:border-neutral-700"}`}
+                  type="button"
+                  onClick={markAllMissingAsCompleted}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-emerald-500 bg-emerald-500 text-white transition-colors hover:bg-emerald-400 hover:border-emerald-400"
                 >
-                  All Missing
+                  Mark All Missing as Completed
                 </button>
-                {missingCrops.map((crop) => (
-                  <button
-                    key={crop}
-                    role="tab"
-                    aria-selected={activeSmartTab === crop}
-                    onClick={() => setSmartTab(crop)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${activeSmartTab === crop
-                      ? "bg-blue-500 text-white border-blue-500"
-                      : "bg-neutral-50 text-neutral-600 border-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:border-neutral-700"}`}
-                  >
-                    {toCropLabel(crop)}
-                  </button>
-                ))}
+                <button
+                  type="button"
+                  onClick={markAllAsMissing}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-neutral-300 bg-neutral-50 text-neutral-700 transition-colors hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
+                >
+                  Mark All as Missing
+                </button>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
@@ -1223,6 +1209,28 @@ export default function Home() {
                           <button type="button" onClick={() => toggleSort("value")} className="inline-flex items-center gap-1">
                             {mode === "profit" ? "Profit / Harvest" : `${targetCrop} Yield`} <span aria-hidden="true">{sortIndicator("value")}</span>
                           </button>
+                        </th>
+                      )}
+                      {mode === "profit" && (
+                        <th className="px-6 py-4 font-semibold text-right text-cyan-600 dark:text-cyan-400 hidden lg:table-cell">
+                          <div className="inline-flex items-center justify-end gap-2">
+                            <button type="button" onClick={() => toggleSort("profit_per_hour")} className="inline-flex items-center gap-1">
+                              Profit / Hour <span aria-hidden="true">{sortIndicator("profit_per_hour")}</span>
+                            </button>
+                            <div className="group relative">
+                              <button
+                                type="button"
+                                tabIndex={0}
+                                aria-label="Profit per hour help"
+                                className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-neutral-500/50 text-[10px] leading-none cursor-help"
+                              >
+                                <Info className="h-3 w-3" />
+                              </button>
+                              <div className="absolute left-1/2 top-full z-20 mt-2 w-72 -translate-x-1/2 rounded bg-neutral-900 px-3 py-2 text-left text-[11px] font-normal normal-case tracking-normal text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                                <p className="leading-snug">Uses expected spawn wait plus growth stages, then converts that full cycle into real hours with the current garden cycle time.</p>
+                              </div>
+                            </div>
+                          </div>
                         </th>
                       )}
                       {mode === "profit" && (
@@ -1371,6 +1379,11 @@ export default function Home() {
                               )}
                               {formatCoins(mode === "target" ? item.score : item.profit)}
                             </div>
+                          </td>
+                        )}
+                        {mode === "profit" && (
+                          <td className="px-6 py-4 text-right font-mono font-bold text-cyan-600 dark:text-cyan-400 hidden lg:table-cell">
+                            {formatGrowthCycleProfit(item.profit_per_hour)}
                           </td>
                         )}
                         {mode === "profit" && (
@@ -1672,6 +1685,10 @@ export default function Home() {
       )}
 
       <style jsx global>{`
+        .pixelated {
+          image-rendering: pixelated;
+          image-rendering: crisp-edges;
+        }
         .icon-fallback .icon-fallback-glyph {
           display: block;
         }
