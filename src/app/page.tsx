@@ -380,7 +380,8 @@ export default function Home() {
   };
 
   const formatGrowthCyclesDisplay = (cycles: number) => {
-    if (cycles <= 1) return "0";
+    if (!Number.isFinite(cycles) || cycles <= 0) return "0";
+    if (cycles === 1) return "1 Cycle";
     return `${cycles} Cycles`;
   };
 
@@ -529,6 +530,9 @@ export default function Home() {
   const selectedMutationGrowthCycles = selectedMutation
     ? formatGrowthCyclesDisplay(selectedMutation.hourly?.g ?? selectedMutation.breakdown.growth_stages)
     : "0";
+  const selectedMutationLifecycle = selectedMutation
+    ? formatDuration(selectedMutation.breakdown.estimated_time_hours)
+    : "0m";
   const selectedMutationYieldCount = selectedMutation?.breakdown.yields.length ?? 0;
 
 
@@ -1094,12 +1098,12 @@ export default function Home() {
 
       {/* Modal Overlay */}
       {selectedMutation && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setSelectedMutation(null)}>
-          <div className="relative flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-neutral-200/80 bg-white/95 shadow-2xl shadow-neutral-950/10 backdrop-blur dark:border-neutral-800 dark:bg-neutral-950/95" onClick={e => e.stopPropagation()}>
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.18),transparent_55%),radial-gradient(circle_at_top_right,_rgba(59,130,246,0.16),transparent_45%)] dark:bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.24),transparent_55%),radial-gradient(circle_at_top_right,_rgba(59,130,246,0.22),transparent_45%)]" />
-            <div className="relative border-b border-neutral-200/70 bg-white/65 px-6 py-6 backdrop-blur dark:border-neutral-800 dark:bg-neutral-950/65 sm:px-8">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 md:p-5 animate-in fade-in duration-200" onClick={() => setSelectedMutation(null)}>
+          <div className="relative flex max-h-[96vh] w-full max-w-[min(96vw,1520px)] flex-col overflow-hidden rounded-[32px] border border-neutral-200/80 bg-white/95 shadow-2xl shadow-neutral-950/20 backdrop-blur dark:border-neutral-800 dark:bg-neutral-950/95" onClick={e => e.stopPropagation()}>
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.22),transparent_55%),radial-gradient(circle_at_top_right,_rgba(59,130,246,0.16),transparent_45%)] dark:bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.28),transparent_55%),radial-gradient(circle_at_top_right,_rgba(59,130,246,0.24),transparent_45%)]" />
+            <div className="relative border-b border-neutral-200/70 bg-white/70 px-6 py-6 backdrop-blur dark:border-neutral-800 dark:bg-neutral-950/70 sm:px-8 lg:px-10">
               <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-4">
+                <div className="flex min-w-0 items-start gap-4 lg:gap-5">
                   <div className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-emerald-200/70 bg-gradient-to-br from-emerald-100 via-white to-emerald-50 text-2xl shadow-sm dark:border-emerald-800/80 dark:from-emerald-950/70 dark:via-neutral-900 dark:to-emerald-900/30">
                     <div className="absolute h-10 w-10 rounded-full bg-emerald-500/10 blur-xl dark:bg-emerald-400/10" aria-hidden="true" />
                     <div className="relative flex h-full w-full items-center justify-center">
@@ -1118,7 +1122,7 @@ export default function Home() {
                       <Sprout className="w-6 h-6 text-emerald-600 dark:text-emerald-400 icon-fallback-glyph hidden" />
                     </div>
                   </div>
-                  <div className="space-y-3">
+                  <div className="min-w-0 space-y-4">
                     <div>
                       <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-emerald-600/80 dark:text-emerald-300/75">Mutation Breakdown</p>
                       <h3 className="mt-2 text-2xl font-black tracking-tight text-neutral-950 dark:text-white">{toMutationLabel(selectedMutation.mutationName)}</h3>
@@ -1126,16 +1130,27 @@ export default function Home() {
                         Harvest snapshot, setup cost, and expected value for {plots} placed plot{plots > 1 ? "s" : ""}.
                       </p>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
-                        {selectedMutation.limit} total placed
-                      </span>
-                      <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700 dark:border-sky-800 dark:bg-sky-900/30 dark:text-sky-300">
-                        {selectedMutationYieldCount} Distinct Drop{selectedMutationYieldCount === 1 ? "" : "s"}
-                      </span>
-                      <span className="rounded-full border border-neutral-200 bg-white/80 px-3 py-1 text-xs font-semibold text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900/70 dark:text-neutral-300">
-                        ~{selectedMutationCycleDuration} cycle
-                      </span>
+                    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+                      <div className="rounded-2xl border border-emerald-200/70 bg-emerald-50/80 px-4 py-3 dark:border-emerald-900/50 dark:bg-emerald-950/25">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">Total Placed</p>
+                        <p className="mt-1 text-lg font-black text-neutral-950 dark:text-white">{selectedMutation.limit}</p>
+                      </div>
+                      <div className="rounded-2xl border border-sky-200/70 bg-sky-50/80 px-4 py-3 dark:border-sky-900/50 dark:bg-sky-950/25">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700 dark:text-sky-300">Growth Cycles</p>
+                        <p className="mt-1 text-lg font-black text-neutral-950 dark:text-white">{selectedMutationGrowthCycles}</p>
+                      </div>
+                      <div className="rounded-2xl border border-cyan-200/70 bg-cyan-50/80 px-4 py-3 dark:border-cyan-900/50 dark:bg-cyan-950/25">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-700 dark:text-cyan-300">Lifecycle</p>
+                        <p className="mt-1 text-lg font-black text-neutral-950 dark:text-white">{selectedMutationLifecycle}</p>
+                      </div>
+                      <div className="rounded-2xl border border-violet-200/70 bg-violet-50/80 px-4 py-3 dark:border-violet-900/50 dark:bg-violet-950/25">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-violet-700 dark:text-violet-300">Distinct Drops</p>
+                        <p className="mt-1 text-lg font-black text-neutral-950 dark:text-white">{selectedMutationYieldCount}</p>
+                      </div>
+                      <div className="rounded-2xl border border-neutral-200/80 bg-white/80 px-4 py-3 dark:border-neutral-700 dark:bg-neutral-900/70">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-500 dark:text-neutral-400">Garden Cycle</p>
+                        <p className="mt-1 text-lg font-black text-neutral-950 dark:text-white">~{selectedMutationCycleDuration}</p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1145,8 +1160,8 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="relative overflow-y-auto px-6 py-6 custom-scrollbar sm:px-8">
-              <div className="grid gap-3 sm:grid-cols-3">
+            <div className="relative overflow-y-auto px-6 py-6 custom-scrollbar sm:px-8 lg:px-10">
+              <div className="grid gap-3 xl:grid-cols-3">
                 <div className="rounded-2xl border border-amber-200/70 bg-gradient-to-br from-amber-50 via-white to-white p-4 shadow-sm dark:border-amber-900/40 dark:from-amber-950/30 dark:via-neutral-900 dark:to-neutral-900">
                   <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-300">
                     <Package className="h-4 w-4" />
@@ -1182,7 +1197,7 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,0.86fr)_minmax(0,1.14fr)]">
+              <div className="mt-6 grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)] 2xl:grid-cols-[400px_minmax(0,1fr)]">
                 <section className="space-y-4">
                   <div className="rounded-3xl border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-emerald-50/60 p-5 shadow-sm dark:border-emerald-900/40 dark:from-emerald-950/20 dark:via-neutral-900 dark:to-neutral-900">
                     <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
@@ -1258,22 +1273,23 @@ export default function Home() {
                 </section>
 
                 <section className="space-y-4">
-                  <div className="rounded-3xl border border-sky-300/30 bg-[linear-gradient(135deg,rgba(59,130,246,0.12),rgba(16,185,129,0.08)_60%,rgba(255,255,255,0.9))] p-5 shadow-sm dark:border-sky-500/20 dark:bg-[linear-gradient(135deg,rgba(30,64,175,0.3),rgba(6,78,59,0.18)_55%,rgba(10,10,10,0.92))]">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="rounded-3xl border border-neutral-200/80 bg-neutral-50/70 p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70">
+                    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-sky-700 dark:text-sky-300">
                           <Sparkles className="h-4 w-4" />
-                          Harvest Forecast
+                          Harvest Yields
                         </div>
-                        <h4 className="mt-2 text-xl font-black text-neutral-950 dark:text-white">Expected Harvest Yields</h4>
+                        <h4 className="mt-2 text-lg font-bold text-neutral-950 dark:text-white">Yield Breakdown</h4>
+                        <p className="text-sm text-neutral-500 dark:text-neutral-400">Amounts, value, and the exact formula used for each drop.</p>
                       </div>
-                      <span className="rounded-full border border-white/60 bg-white/70 px-3 py-1 text-xs font-semibold text-neutral-600 backdrop-blur dark:border-neutral-700 dark:bg-neutral-900/70 dark:text-neutral-300">
-                        ~{selectedMutationCycleDuration} cycle
+                      <span className="rounded-full border border-neutral-200 bg-white px-3 py-1 text-xs font-semibold text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300">
+                        {selectedMutationYieldCount} Distinct Drop{selectedMutationYieldCount === 1 ? "" : "s"}
                       </span>
                     </div>
 
                     {(selectedMutation.mutationName === "Magic Jellybean" || selectedMutation.mutationName === "All-in Aloe") && (
-                      <div className="mt-4 rounded-2xl border border-sky-400/20 bg-white/60 p-4 dark:bg-sky-950/20">
+                      <div className="mb-4 rounded-2xl border border-sky-400/20 bg-white/70 p-4 dark:border-sky-500/20 dark:bg-sky-950/20">
                         <div className="flex items-start gap-3">
                           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-sky-600 dark:text-sky-300" />
                           <p className="text-sm leading-6 text-sky-800 dark:text-sky-200">
@@ -1285,48 +1301,12 @@ export default function Home() {
                       </div>
                     )}
 
-                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                      <div className="rounded-2xl border border-white/60 bg-white/70 p-4 backdrop-blur dark:border-neutral-700 dark:bg-neutral-900/70">
-                        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700 dark:text-sky-300">
-                          <Clock className="h-4 w-4" />
-                          Growth
-                        </div>
-                        <div className="mt-2 text-xl font-black text-neutral-950 dark:text-white">{selectedMutationGrowthCycles}</div>
-                        <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">Post-spawn cycles until harvestable.</p>
-                      </div>
-                      <div className="rounded-2xl border border-white/60 bg-white/70 p-4 backdrop-blur dark:border-neutral-700 dark:bg-neutral-900/70">
-                        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700 dark:text-sky-300">
-                          <Clock className="h-4 w-4" />
-                          Lifecycle
-                        </div>
-                        <div className="mt-2 text-xl font-black text-neutral-950 dark:text-white">{formatDuration(selectedMutation.breakdown.estimated_time_hours)}</div>
-                        <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">Estimated time from spawn window to harvest.</p>
-                      </div>
-                      <div className="rounded-2xl border border-white/60 bg-white/70 p-4 backdrop-blur dark:border-neutral-700 dark:bg-neutral-900/70">
-                        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700 dark:text-sky-300">
-                          <Sprout className="h-4 w-4" />
-                          Distinct Drops
-                        </div>
-                        <div className="mt-2 text-xl font-black text-neutral-950 dark:text-white">{selectedMutationYieldCount}</div>
-                        <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">Number of different items produced in one harvest.</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="rounded-3xl border border-neutral-200/80 bg-neutral-50/70 p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70">
-                    <div className="mb-4 flex items-center justify-between gap-3">
-                      <div>
-                        <h4 className="text-lg font-bold text-neutral-950 dark:text-white">Yield Breakdown</h4>
-                        <p className="text-sm text-neutral-500 dark:text-neutral-400">Amounts, value, and the exact formula used for each drop.</p>
-                      </div>
-                    </div>
-
                     {selectedMutation.breakdown.yields && selectedMutation.breakdown.yields.length > 0 ? (
                       <div className="space-y-3">
                         {selectedMutation.breakdown.yields.map((yld) => (
                           <div key={yld.name} className="rounded-2xl border border-neutral-200/70 bg-gradient-to-br from-white via-white to-neutral-50 p-4 shadow-sm dark:border-neutral-800 dark:from-neutral-950 dark:via-neutral-950 dark:to-neutral-900">
-                            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                              <div className="min-w-0 flex-1">
+                            <div className="grid gap-4 xl:grid-cols-[minmax(0,0.7fr)_minmax(0,1.4fr)_220px] xl:items-center">
+                              <div className="min-w-0">
                                 <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-400">
                                   <Sparkles className="h-3.5 w-3.5" />
                                   Expected yield
@@ -1335,30 +1315,36 @@ export default function Home() {
                                   <span className="text-2xl font-black tracking-tight text-neutral-950 dark:text-white">{formatCoins(yld.amount)}x</span>
                                   <span className="text-xl font-semibold text-emerald-700 dark:text-emerald-300">{toCropLabel(yld.name)}</span>
                                 </div>
-                                {yld.math && (
-                                  <div className="mt-4 rounded-2xl border border-neutral-200/80 bg-neutral-950 px-3 py-3 text-[11px] shadow-inner dark:border-neutral-700">
+                              </div>
+                              {yld.math && (
+                                <div className="rounded-2xl border border-neutral-200/80 bg-neutral-950 px-3 py-3 text-[11px] shadow-inner dark:border-neutral-700">
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
                                     <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-400">
                                       Calculation Breakdown
                                     </div>
                                     {showsAdditiveGardenBreakdown(yld.math) && (
-                                      <p className="mt-2 text-xs leading-5 text-neutral-400">
-                                        Garden and Unique Crop buffs are added on top of the base 1.60 garden multiplier.
+                                      <p className="text-[11px] text-neutral-400">
+                                        1.60 garden base plus upgrade buffs
                                       </p>
                                     )}
-                                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                                  </div>
+                                  <div className="mt-3 overflow-x-auto pb-1">
+                                    <div className="flex min-w-max items-center gap-2">
                                       {getYieldCalculationSteps(yld).map((step, index) => (
                                         <Fragment key={`${yld.name}-${step.label}`}>
                                           {index > 0 && <span className="text-sm font-black text-neutral-500">×</span>}
                                           <div className={`rounded-xl border px-3 py-2 ${getCalculationToneClasses(step.tone)}`}>
-                                            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] opacity-70">{step.label}</p>
-                                            <p className="mt-1 font-mono text-sm font-black">{step.value}</p>
+                                            <div className="flex items-center gap-2 whitespace-nowrap">
+                                              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] opacity-70">{step.label}</p>
+                                              <p className="font-mono text-sm font-black">{step.value}</p>
+                                            </div>
                                           </div>
                                         </Fragment>
                                       ))}
                                     </div>
                                   </div>
-                                )}
-                              </div>
+                                </div>
+                              )}
                               <div className="shrink-0 rounded-2xl border border-emerald-300/20 bg-emerald-500/10 px-4 py-3 text-right dark:border-emerald-500/20 dark:bg-emerald-500/10">
                                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">Value</div>
                                 <div className="mt-1 text-2xl font-black font-mono text-emerald-600 dark:text-emerald-300">{formatCoins(yld.total_value)}</div>
