@@ -266,6 +266,27 @@ class LeaderboardTests(unittest.TestCase):
         self.assertAlmostEqual(lonelily["profit_per_growth_cycle"], lonelily["profit"], places=6)
 
     @patch("api.index.get_bazaar_prices", return_value={})
+    def test_merged_mushroom_yield_sums_base_drop_for_formula_display(self, _mock_prices):
+        result = get_leaderboard(
+            plots=3,
+            fortune=2500,
+            gh_upgrade=9,
+            unique_crops=12,
+            mode="profit",
+            setup_mode="buy_order",
+            sell_mode="sell_offer",
+            target_crop=None,
+            maxed_crops="",
+        )
+
+        devourer = next((m for m in result["leaderboard"] if m["mutationName"] == "Devourer"), None)
+        self.assertIsNotNone(devourer)
+
+        mushroom = next((y for y in devourer["breakdown"]["yields"] if y["name"] == "Mushroom"), None)
+        self.assertIsNotNone(mushroom)
+        self.assertAlmostEqual(mushroom["math"]["base"], 1900.0, places=6)
+
+    @patch("api.index.get_bazaar_prices", return_value={})
     def test_all_in_aloe_uses_reset_adjusted_special_multiplier_at_stage_14(self, _mock_prices):
         result = get_leaderboard(
             plots=3,

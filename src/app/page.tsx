@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { Fragment, useState, useEffect, useMemo, useRef } from "react";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Coins, Sprout, Clock, Calculator, Loader2, ArrowUpRight, AlertTriangle, X, Info, Package, TrendingUp, Sparkles } from "lucide-react";
 import Image from "next/image";
@@ -34,6 +34,14 @@ type YieldItem = {
   unit_price: number;
   total_value: number;
   math?: YieldMath;
+};
+
+type CalculationTone = "neutral" | "plots" | "garden" | "unique" | "wart" | "fortune" | "special";
+
+type CalculationStep = {
+  label: string;
+  value: string;
+  tone: CalculationTone;
 };
 
 type MutationBreakdown = {
@@ -350,6 +358,12 @@ export default function Home() {
     return formatCoins(num);
   };
 
+  const formatPreciseValue = (num: number, digits = 2) =>
+    num.toLocaleString("en-US", {
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    });
+
   const formatDuration = (hours: number) => {
     const safeHours = Number.isFinite(hours) ? hours : 0;
     const totalMinutes = Math.max(0, Math.round(safeHours * 60));
@@ -375,7 +389,26 @@ export default function Home() {
     return formatGrowthCyclesDisplay(fallback);
   };
 
-  const formatYieldCalculation = (math: YieldMath, unitPrice: number) => {
+  const getCalculationToneClasses = (tone: CalculationTone) => {
+    const tones: Record<CalculationTone, string> = {
+      neutral: "border-neutral-700/80 bg-neutral-900/80 text-neutral-100",
+      plots: "border-emerald-500/30 bg-emerald-500/10 text-emerald-100",
+      garden: "border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-100",
+      unique: "border-sky-500/30 bg-sky-500/10 text-sky-100",
+      wart: "border-red-500/30 bg-red-500/10 text-red-100",
+      fortune: "border-amber-500/30 bg-amber-500/10 text-amber-100",
+      special: "border-cyan-500/30 bg-cyan-500/10 text-cyan-100",
+    };
+    return tones[tone];
+  };
+
+  const getYieldCalculationSteps = (yld: YieldItem): CalculationStep[] => {
+    if (!yld.math || !selectedMutation) return [];
+
+    const math = yld.math;
+    const spotsPerPlot = selectedMutation.breakdown.base_limit;
+    const totalSpots = spotsPerPlot * plots;
+    const spawnFactor = totalSpots > 0 ? math.limit / totalSpots : 1;
     const isPlainMutationMath =
       math.base === 1 &&
       math.gh_buff === 0 &&
@@ -383,27 +416,35 @@ export default function Home() {
       math.wart_buff === 1 &&
       math.fortune === 1 &&
       math.special === 1;
-
-    if (isPlainMutationMath) {
-      return `1 base × ${math.limit} total across plots × ${formatCoins(unitPrice)} price`;
-    }
-
-    const factors = [
-      `${math.base} base`,
-      `${math.limit} limit`,
-      `(+${math.gh_buff.toFixed(2)} GH)`,
-      `(+${math.unique_buff.toFixed(2)} Unique)`,
-      `${math.wart_buff} wart buff`,
-      `${math.fortune.toFixed(2)} fortune`,
+    const steps: CalculationStep[] = [
+      { label: "Base Drop", value: formatCoins(math.base), tone: "neutral" },
+      { label: "Spots per Plot", value: formatCoins(spotsPerPlot), tone: "neutral" },
+      { label: "Plots", value: formatCoins(plots), tone: "plots" },
     ];
 
-    if (math.special !== 1) {
-      factors.push(`${math.special} special buff`);
+    if (Number.isFinite(spawnFactor) && Math.abs(spawnFactor - 1) > 1e-6) {
+      steps.push({ label: "Spawn Factor", value: formatPreciseValue(spawnFactor), tone: "special" });
     }
 
-    factors.push(`${formatCoins(unitPrice)} price`);
-    return factors.join(" × ");
+    if (!isPlainMutationMath) {
+      steps.push({ label: "Base Garden Multiplier", value: formatPreciseValue(1.6), tone: "neutral" });
+      if (math.gh_buff !== 0) {
+        steps.push({ label: "Garden Buff", value: `+${formatPreciseValue(math.gh_buff)}`, tone: "garden" });
+      }
+      if (math.unique_buff !== 0) {
+        steps.push({ label: "Unique Crop Buff", value: `+${formatPreciseValue(math.unique_buff)}`, tone: "unique" });
+      }
+      steps.push({ label: "Wart Boost", value: formatPreciseValue(math.wart_buff), tone: "wart" });
+      steps.push({ label: "Fortune Multiplier", value: formatPreciseValue(math.fortune), tone: "fortune" });
+    }
+
+    steps.push({ label: "Special Multiplier", value: formatPreciseValue(math.special), tone: "special" });
+    steps.push({ label: "Market Price", value: formatCoins(yld.unit_price), tone: "neutral" });
+    return steps;
   };
+
+  const showsAdditiveGardenBreakdown = (math?: YieldMath) =>
+    Boolean(math && (math.gh_buff !== 0 || math.unique_buff !== 0));
 
   const missingCrops = mode === "smart" ? (data?.metadata.missing_crops ?? []) : [];
   const activeSmartTab = missingCrops.includes(smartTab) ? smartTab : "all";
@@ -633,12 +674,33 @@ export default function Home() {
             <div className="mb-6 rounded-xl border border-neutral-200 dark:border-neutral-800 p-3 space-y-3">
               <p className="text-sm font-medium">Fortune Buffs</p>
 
-              <label className="flex items-center justify-between gap-3">
-                <span className="inline-flex items-center gap-2 text-xs">
-                  Improved Harvest Boost (+30% crop yield)
-                </span>
-                <input type="checkbox" checked={useImprovedHarvestBoost} onChange={(e) => setUseImprovedHarvestBoost(e.target.checked)} className="accent-emerald-500" />
-              </label>
+              <div className="rounded-xl border border-red-200/80 bg-red-50/70 p-3 dark:border-red-900/40 dark:bg-red-950/20">
+                <label className="flex items-start justify-between gap-3">
+                  <span className="min-w-0">
+                    <span className="inline-flex items-center gap-2 text-xs font-semibold text-red-700 dark:text-red-300">
+                      Improved Harvest Boost (Wart Buff)
+                      <span className="group relative inline-flex">
+                        <button
+                          type="button"
+                          tabIndex={0}
+                          aria-label="Improved Harvest Boost info"
+                          onClick={(e) => e.preventDefault()}
+                          className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-red-400/60 text-[10px] leading-none"
+                        >
+                          <Info className="h-3 w-3" />
+                        </button>
+                        <span className="absolute left-1/2 top-full z-20 mt-2 w-56 -translate-x-1/2 rounded bg-neutral-900 px-3 py-2 text-left text-[11px] font-normal normal-case tracking-normal text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                          Applies the Nether Wart farming multiplier.
+                        </span>
+                      </span>
+                    </span>
+                    <span className="mt-1 block text-[11px] text-red-600/80 dark:text-red-300/80">
+                      Current wart boost: {useImprovedHarvestBoost ? "1.30x" : "1.00x"}
+                    </span>
+                  </span>
+                  <input type="checkbox" checked={useImprovedHarvestBoost} onChange={(e) => setUseImprovedHarvestBoost(e.target.checked)} className="mt-0.5 accent-red-500" />
+                </label>
+              </div>
 
               <label className="flex items-center justify-between gap-3">
                 <span className="inline-flex items-center gap-2 text-xs">
@@ -1061,7 +1123,7 @@ export default function Home() {
                         {selectedMutation.limit} total placed
                       </span>
                       <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700 dark:border-sky-800 dark:bg-sky-900/30 dark:text-sky-300">
-                        {selectedMutationYieldCount} yield line{selectedMutationYieldCount === 1 ? "" : "s"}
+                        {selectedMutationYieldCount} Distinct Drop{selectedMutationYieldCount === 1 ? "" : "s"}
                       </span>
                       <span className="rounded-full border border-neutral-200 bg-white/80 px-3 py-1 text-xs font-semibold text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900/70 dark:text-neutral-300">
                         ~{selectedMutationCycleDuration} cycle
@@ -1235,10 +1297,10 @@ export default function Home() {
                       <div className="rounded-2xl border border-white/60 bg-white/70 p-4 backdrop-blur dark:border-neutral-700 dark:bg-neutral-900/70">
                         <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700 dark:text-sky-300">
                           <Sprout className="h-4 w-4" />
-                          Yield Mix
+                          Distinct Drops
                         </div>
                         <div className="mt-2 text-xl font-black text-neutral-950 dark:text-white">{selectedMutationYieldCount}</div>
-                        <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">Distinct drop lines expected in the harvest.</p>
+                        <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">Number of different items produced in one harvest.</p>
                       </div>
                     </div>
                   </div>
@@ -1266,8 +1328,26 @@ export default function Home() {
                                   <span className="text-xl font-semibold text-emerald-700 dark:text-emerald-300">{toCropLabel(yld.name)}</span>
                                 </div>
                                 {yld.math && (
-                                  <div className="mt-4 rounded-2xl border border-neutral-200/80 bg-neutral-950 px-3 py-2 text-[11px] font-mono leading-5 text-neutral-200 shadow-inner dark:border-neutral-700">
-                                    <span className="font-semibold text-emerald-300">Calculation:</span> {formatYieldCalculation(yld.math, yld.unit_price)}
+                                  <div className="mt-4 rounded-2xl border border-neutral-200/80 bg-neutral-950 px-3 py-3 text-[11px] shadow-inner dark:border-neutral-700">
+                                    <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-400">
+                                      Calculation Breakdown
+                                    </div>
+                                    {showsAdditiveGardenBreakdown(yld.math) && (
+                                      <p className="mt-2 text-xs leading-5 text-neutral-400">
+                                        Garden and Unique Crop buffs are added on top of the base 1.60 garden multiplier.
+                                      </p>
+                                    )}
+                                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                                      {getYieldCalculationSteps(yld).map((step, index) => (
+                                        <Fragment key={`${yld.name}-${step.label}`}>
+                                          {index > 0 && <span className="text-sm font-black text-neutral-500">×</span>}
+                                          <div className={`rounded-xl border px-3 py-2 ${getCalculationToneClasses(step.tone)}`}>
+                                            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] opacity-70">{step.label}</p>
+                                            <p className="mt-1 font-mono text-sm font-black">{step.value}</p>
+                                          </div>
+                                        </Fragment>
+                                      ))}
+                                    </div>
                                   </div>
                                 )}
                               </div>

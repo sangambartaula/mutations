@@ -353,10 +353,11 @@ def get_leaderboard(
                 sm_display = effective_special_mult
                     
                 crop_price = get_item_price(crop_col, False, sell_mode)
-                if crop_col == "Red Mushroom " or crop_col == "Brown Mushroom": crop_price = 10
+                if crop_col in {"Red Mushroom", "Red Mushroom ", "Brown Mushroom"}:
+                    crop_price = 10
                 expected_drops_value += expected_drops * crop_price
                 
-                display_name = "Mushroom" if (crop_col == "Red Mushroom " or crop_col == "Brown Mushroom") else crop_col
+                display_name = "Mushroom" if crop_col in {"Red Mushroom", "Red Mushroom ", "Brown Mushroom"} else crop_col
                 
                 # Merge mushroom drops visually if multiple
                 existing = next((item for item in yields if item["name"] == display_name), None)
