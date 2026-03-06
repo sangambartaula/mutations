@@ -192,7 +192,7 @@ const faqItems = [
       "Profit per Harvest is the profit from one full planted batch once everything is grown.",
       "Profit per Growth Cycle adds expected spawn time to the mutation's growth stages. Most mutations use a 25 percent spawn chance per garden growth cycle, so their expected spawn wait is 1 / 0.25 = 4 cycles.",
       "Lonelily uses its own rarer spawn estimate instead. Profit per Hour then converts those expected cycles into real time using the current garden cycle duration.",
-      "The Growth Cycles column only shows post-spawn growth stages, so instant mutations display as 0 Cycles while their timing metrics still include expected spawn wait.",
+      "The Growth Cycles column only shows post-spawn growth stages. If a mutation has 0 growth stages, it will display as 0 Cycles and Instant while the timing metrics still include expected spawn wait.",
     ],
   },
   {

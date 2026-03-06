@@ -271,6 +271,48 @@ class LeaderboardTests(unittest.TestCase):
         self.assertAlmostEqual(veil["hourly"]["expected_hours"], expected_hours, places=6)
 
     @patch("api.index.get_bazaar_prices", return_value={})
+    def test_zero_growth_stage_mutations_keep_instant_display_fields(self, _mock_prices):
+        instant_mutation = {
+            "name": "Instant Test Mutation",
+            "base_limit": 16,
+            "ingredients": tuple(),
+            "growth_stages": 0,
+            "effective_special_multiplier": 1.0,
+            "mutation_chance_override": None,
+            "crop_drops": (
+                {
+                    "source_name": "Wheat",
+                    "display_name": "Wheat",
+                    "canonical_name": "Wheat",
+                    "base_drop": 200.0,
+                    "price_override": None,
+                },
+            ),
+        }
+
+        from api import index as api_index
+
+        with patch.object(api_index, "MUTATION_CATALOG", api_index.MUTATION_CATALOG + (instant_mutation,)):
+            result = get_leaderboard(
+                plots=3,
+                fortune=2500,
+                gh_upgrade=9,
+                unique_crops=12,
+                mode="profit",
+                setup_mode="buy_order",
+                sell_mode="sell_offer",
+                target_crop=None,
+                maxed_crops="",
+            )
+
+        instant = next((m for m in result["leaderboard"] if m["mutationName"] == "Instant Test Mutation"), None)
+        self.assertIsNotNone(instant)
+        self.assertEqual(instant["breakdown"]["growth_stages"], 0)
+        self.assertAlmostEqual(instant["breakdown"]["estimated_time_hours"], 0.0, places=6)
+        expected_hours = (1.0 / DEFAULT_METRIC_SPAWN_CHANCE) * result["metadata"]["cycle_time_hours"]
+        self.assertAlmostEqual(instant["hourly"]["expected_hours"], expected_hours, places=6)
+
+    @patch("api.index.get_bazaar_prices", return_value={})
     def test_profit_per_hour_matches_expected_cycle_model(self, _mock_prices):
         result = get_leaderboard(
             plots=3,
