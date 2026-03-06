@@ -595,8 +595,6 @@ def get_leaderboard(
         mut_name = mutation["name"]
         base_limit = mutation["base_limit"]
         limit = base_limit * plots
-        mutation_chance_override = mutation["mutation_chance_override"]
-        mutation_chance_effective = mutation_chance_override if mutation_chance_override is not None else float(mutation_chance)
 
         # 1. Setup Cost
         opt_cost = 0.0
@@ -626,10 +624,9 @@ def get_leaderboard(
         # 2. Return per Batch (One Harvest)
         growth_stages = mutation["growth_stages"]
         effective_special_mult = mutation["effective_special_multiplier"]
-        spawn_fill_fraction = 1.0
-        if mutation_chance_override is not None:
-            spawn_fill_fraction = 1.0 - ((1.0 - mutation_chance_effective) ** growth_stages)
-        effective_limit = limit * spawn_fill_fraction
+        # Breakdown and profit-per-harvest values represent a full mature batch.
+        # Spawn probability is only applied in expected-cycle timing metrics.
+        effective_limit = float(limit)
 
         # Lifecycle display is post-spawn only. Expected spawn wait is handled in expected-cycle metrics.
         estimated_time = growth_stages * cycle_time_hours

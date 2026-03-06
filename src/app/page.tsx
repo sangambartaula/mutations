@@ -8,7 +8,7 @@ import Image from "next/image";
 type OptimizationMode = "profit" | "smart" | "target";
 type SetupMode = "buy_order" | "insta_buy";
 type SellMode = "sell_offer" | "insta_sell";
-type SortKey = "rank" | "mutation" | "value" | "growth_cycle_profit" | "profit_per_hour" | "cycles" | "setup";
+type SortKey = "mutation" | "value" | "growth_cycle_profit" | "profit_per_hour" | "cycles" | "time" | "setup";
 type SortDirection = "asc" | "desc";
 type ChipRarity = "rare" | "epic" | "legendary";
 
@@ -232,7 +232,7 @@ export default function Home() {
   const [mode, setMode] = useState<OptimizationMode>("profit");
   const [targetCrop, setTargetCrop] = useState("Wheat");
   const [maxedCrops, setMaxedCrops] = useState<string[]>([]);
-  const [sortKey, setSortKey] = useState<SortKey>("rank");
+  const [sortKey, setSortKey] = useState<SortKey>("value");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
   // New Toggles
@@ -388,6 +388,13 @@ export default function Home() {
   useEffect(() => {
     setOverdriveChipLevel((current) => clampChipLevelByRarity(current, overdriveChipRarity));
   }, [overdriveChipRarity]);
+
+  useEffect(() => {
+    if (mode !== "profit" && (sortKey === "growth_cycle_profit" || sortKey === "profit_per_hour")) {
+      setSortKey("value");
+      setSortDirection("desc");
+    }
+  }, [mode, sortKey]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -643,6 +650,7 @@ export default function Home() {
     if (key === "growth_cycle_profit") return item.profit_per_growth_cycle ?? null;
     if (key === "profit_per_hour") return item.profit_per_hour;
     if (key === "cycles") return item.hourly?.g ?? item.breakdown.growth_stages;
+    if (key === "time") return item.breakdown.estimated_time_hours;
     if (key === "setup") return item.opt_cost;
     if (key === "value") {
       if (mode === "smart") {
@@ -1188,11 +1196,7 @@ export default function Home() {
                 <table className="w-full text-sm text-left">
                   <thead className="text-xs uppercase bg-neutral-100 dark:bg-neutral-800/50 text-neutral-500 dark:text-neutral-400 border-b border-neutral-200 dark:border-neutral-800">
                     <tr>
-                      <th className="px-6 py-4 font-semibold w-16 text-center">
-                        <button type="button" onClick={() => toggleSort("rank")} className="inline-flex items-center gap-1">
-                          Rank <span aria-hidden="true">{sortIndicator("rank")}</span>
-                        </button>
-                      </th>
+                      <th className="px-6 py-4 font-semibold w-16 text-center">Rank</th>
                       <th className="px-6 py-4 font-semibold">
                         <button type="button" onClick={() => toggleSort("mutation")} className="inline-flex items-center gap-1">
                           Mutation <span aria-hidden="true">{sortIndicator("mutation")}</span>
@@ -1262,7 +1266,9 @@ export default function Home() {
                       </th>
                       <th className="px-6 py-4 font-semibold text-right hidden lg:table-cell">
                         <div className="inline-flex items-center justify-end gap-2">
-                          <span>Time</span>
+                          <button type="button" onClick={() => toggleSort("time")} className="inline-flex items-center gap-1">
+                            Time <span aria-hidden="true">{sortIndicator("time")}</span>
+                          </button>
                           <div className="group relative">
                             <button
                               type="button"

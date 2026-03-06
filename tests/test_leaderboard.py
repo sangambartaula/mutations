@@ -407,7 +407,7 @@ class LeaderboardTests(unittest.TestCase):
         self.assertAlmostEqual(aloe["profit_per_hour"], aloe["profit"] / expected_hours, places=6)
 
     @patch("api.index.get_bazaar_prices", return_value={})
-    def test_lonelily_override_affects_profit_mode_mutation_count(self, _mock_prices):
+    def test_lonelily_uses_full_harvest_breakdown_but_special_timing_metrics(self, _mock_prices):
         result = get_leaderboard(
             plots=3,
             fortune=2500,
@@ -427,8 +427,7 @@ class LeaderboardTests(unittest.TestCase):
         self.assertIsNotNone(lonelily)
         lonelily_yield = next((y for y in lonelily["breakdown"]["yields"] if y["name"] == "Lonelily"), None)
         self.assertIsNotNone(lonelily_yield)
-        # 25 per plot * 3 plots * 0.02 chance over 1 cycle
-        self.assertAlmostEqual(lonelily_yield["amount"], 1.5, places=6)
+        self.assertAlmostEqual(lonelily_yield["amount"], 75.0, places=6)
         expected_cycles = (1.0 / LONELILY_METRIC_SPAWN_CHANCE) + lonelily["breakdown"]["growth_stages"]
         self.assertAlmostEqual(lonelily["hourly"]["p"], LONELILY_METRIC_SPAWN_CHANCE, places=9)
         self.assertAlmostEqual(lonelily["profit_per_growth_cycle"], lonelily["profit"] / expected_cycles, places=6)
