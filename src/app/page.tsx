@@ -135,6 +135,10 @@ const faqItems = [
     answer: "Warnings call out cases where the estimate is less reliable in practice, such as wide market spreads, Devourer spread risk, Magic Jellybean's long maturity, or All-in Aloe's reset behavior.",
   },
   {
+    question: "Why does All-in Aloe use 9.37x instead of 60x?",
+    answer: "Stage 14 has a raw 60x multiplier, but the calculator uses the reset-adjusted expected value at that stage, which is 9.37x. That keeps the result aligned with expected harvest value instead of peak best-case value.",
+  },
+  {
     question: "Which settings change the estimates?",
     answer: "Plots, Greenhouse upgrades, Unique Crops, Farming Fortune, harvest-related buffs, and your chosen buy or sell strategy all feed into the final result.",
   },
@@ -438,7 +442,11 @@ export default function Home() {
       steps.push({ label: "Fortune Multiplier", value: formatPreciseValue(math.fortune), tone: "fortune" });
     }
 
-    steps.push({ label: "Special Multiplier", value: formatPreciseValue(math.special), tone: "special" });
+    steps.push({
+      label: selectedMutation.mutationName === "All-in Aloe" ? "Expected Special Multiplier" : "Special Multiplier",
+      value: formatPreciseValue(math.special),
+      tone: "special"
+    });
     steps.push({ label: "Market Price", value: formatCoins(yld.unit_price), tone: "neutral" });
     return steps;
   };
@@ -1271,7 +1279,7 @@ export default function Home() {
                           <p className="text-sm leading-6 text-sky-800 dark:text-sky-200">
                             {selectedMutation.mutationName === "Magic Jellybean"
                               ? "Magic Jellybean is exceptionally rare and has 120 growth stages, so it takes much longer than standard mutations to mature."
-                              : "All-in Aloe should be harvested at Stage 14 to avoid the maturity reset mechanic and preserve the best outcome."}
+                              : "All-in Aloe is evaluated at Stage 14 because that is the best expected harvest window. The raw stage multiplier there is 60x, but the calculator uses the reset-adjusted expected multiplier of 9.37x."}
                           </p>
                         </div>
                       </div>

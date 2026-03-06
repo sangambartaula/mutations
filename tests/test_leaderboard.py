@@ -143,7 +143,7 @@ class LeaderboardTests(unittest.TestCase):
         }
         self.assertTrue(any("Devourer can spread" in msg for msg in messages_by_name["Devourer"]))
         self.assertTrue(any("Magic Jellybean takes much longer" in msg for msg in messages_by_name["Magic Jellybean"]))
-        self.assertTrue(any("All-in Aloe can reset" in msg for msg in messages_by_name["All-in Aloe"]))
+        self.assertTrue(any("raw multiplier there is 60x" in msg for msg in messages_by_name["All-in Aloe"]))
 
     @patch("api.index.get_bazaar_prices", return_value={"Magic Jellybean": {"buyPrice": 1000, "sellPrice": 900}})
     def test_profit_per_hour_includes_harvest_multiplier_in_v_net(self, _mock_prices):

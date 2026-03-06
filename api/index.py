@@ -178,7 +178,7 @@ def build_warning_messages(mutation_name: str, market_warning: bool) -> List[str
     if mutation_name == "Magic Jellybean":
         messages.append("Magic Jellybean takes much longer to mature than most mutations, so real runs can vary more over time.")
     if mutation_name == "All-in Aloe":
-        messages.append("All-in Aloe can reset its multiplier, so the displayed result is only an estimate of the best harvest window.")
+        messages.append("All-in Aloe is evaluated at Stage 14. Its raw multiplier there is 60x, but the calculator uses the reset-adjusted expected multiplier of 9.37x.")
     return messages
 
 
