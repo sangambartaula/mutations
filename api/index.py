@@ -363,6 +363,8 @@ def get_leaderboard(
                 if existing:
                     existing["amount"] += expected_drops
                     existing["total_value"] += expected_drops * crop_price
+                    if existing.get("math"):
+                        existing["math"]["base"] += bd_display
                 else:
                     yields.append({
                         "name": display_name,
