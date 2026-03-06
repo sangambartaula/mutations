@@ -14,6 +14,7 @@ type SortDirection = "asc" | "desc";
 type YieldMath = {
   base: number;
   limit: number;
+  evergreen_buff?: number;
   gh_buff: number;
   unique_buff: number;
   wart_buff: number;
@@ -36,7 +37,7 @@ type YieldItem = {
   math?: YieldMath;
 };
 
-type CalculationTone = "neutral" | "plots" | "garden" | "unique" | "wart" | "fortune" | "special";
+type CalculationTone = "neutral" | "plots" | "garden" | "unique" | "evergreen" | "wart" | "fortune" | "special";
 
 type CalculationStep = {
   label: string;
@@ -90,6 +91,21 @@ type LeaderboardResponse = {
       hypercharge_level: number;
       affected_multiplier: number;
     };
+    yield_breakdown?: {
+      base_multiplier: number;
+      evergreen_chip_level: number;
+      evergreen_bonus: number;
+      greenhouse_yield_upgrade: number;
+      greenhouse_yield_bonus: number;
+      unique_crops: number;
+      unique_crop_bonus: number;
+      wart_multiplier: number;
+    };
+    speed_breakdown?: {
+      greenhouse_speed_upgrade: number;
+      greenhouse_speed_reduction: number;
+      unique_speed_reduction: number;
+    };
   };
 };
 
@@ -140,7 +156,7 @@ const faqItems = [
   },
   {
     question: "Which settings change the estimates?",
-    answer: "Plots, Greenhouse upgrades, Unique Crops, Farming Fortune, harvest-related buffs, and your chosen buy or sell strategy all feed into the final result.",
+    answer: "Plots, greenhouse yield, greenhouse speed, Evergreen Chip level, Unique Crops, Wart Boost, Farming Fortune, harvest-related buffs, and your chosen buy or sell strategy all feed into the final result.",
   },
 ] as const;
 
@@ -152,8 +168,10 @@ export default function Home() {
   const [useInfiniVacuum, setUseInfiniVacuum] = useState(false);
   const [useDarkCacao, setUseDarkCacao] = useState(false);
   const [hyperchargeLevel, setHyperchargeLevel] = useState(0);
-  const [ghUpgrade, setGhUpgrade] = useState(9);
+  const [ghYieldUpgrade, setGhYieldUpgrade] = useState(9);
+  const [ghSpeedUpgrade, setGhSpeedUpgrade] = useState(9);
   const [uniqueCrops, setUniqueCrops] = useState(12);
+  const [evergreenChipLevel, setEvergreenChipLevel] = useState(20);
 
   const [mode, setMode] = useState<OptimizationMode>("profit");
   const [targetCrop, setTargetCrop] = useState("Wheat");
@@ -226,8 +244,15 @@ export default function Home() {
         if (typeof parsed.useInfiniVacuum === "boolean") setUseInfiniVacuum(parsed.useInfiniVacuum);
         if (typeof parsed.useDarkCacao === "boolean") setUseDarkCacao(parsed.useDarkCacao);
         if (typeof parsed.hyperchargeLevel === "number") setHyperchargeLevel(Math.max(0, Math.min(20, parsed.hyperchargeLevel)));
-        if (typeof parsed.ghUpgrade === "number") setGhUpgrade(Math.max(0, Math.min(9, parsed.ghUpgrade)));
+        const legacyGhUpgrade = typeof parsed.ghUpgrade === "number"
+          ? Math.max(0, Math.min(9, parsed.ghUpgrade))
+          : 9;
+        if (typeof parsed.ghYieldUpgrade === "number") setGhYieldUpgrade(Math.max(0, Math.min(9, parsed.ghYieldUpgrade)));
+        else setGhYieldUpgrade(legacyGhUpgrade);
+        if (typeof parsed.ghSpeedUpgrade === "number") setGhSpeedUpgrade(Math.max(0, Math.min(9, parsed.ghSpeedUpgrade)));
+        else setGhSpeedUpgrade(legacyGhUpgrade);
         if (typeof parsed.uniqueCrops === "number") setUniqueCrops(Math.max(0, Math.min(12, parsed.uniqueCrops)));
+        if (typeof parsed.evergreenChipLevel === "number") setEvergreenChipLevel(Math.max(0, Math.min(20, parsed.evergreenChipLevel)));
         if (parsed.setupMode === "buy_order" || parsed.setupMode === "insta_buy") setSetupMode(parsed.setupMode);
         if (parsed.sellMode === "sell_offer" || parsed.sellMode === "insta_sell") setSellMode(parsed.sellMode);
       }
@@ -246,8 +271,10 @@ export default function Home() {
         useInfiniVacuum,
         useDarkCacao,
         hyperchargeLevel,
-        ghUpgrade,
+        ghYieldUpgrade,
+        ghSpeedUpgrade,
         uniqueCrops,
+        evergreenChipLevel,
         setupMode,
         sellMode,
       }));
@@ -262,8 +289,10 @@ export default function Home() {
     useInfiniVacuum,
     useDarkCacao,
     hyperchargeLevel,
-    ghUpgrade,
+    ghYieldUpgrade,
+    ghSpeedUpgrade,
     uniqueCrops,
+    evergreenChipLevel,
     setupMode,
     sellMode,
   ]);
@@ -282,8 +311,10 @@ export default function Home() {
       infini_vacuum: useInfiniVacuum ? "true" : "false",
       dark_cacao: useDarkCacao ? "true" : "false",
       hypercharge_level: hyperchargeLevel.toString(),
-      gh_upgrade: ghUpgrade.toString(),
+      gh_yield_upgrade: ghYieldUpgrade.toString(),
+      gh_speed_upgrade: ghSpeedUpgrade.toString(),
       unique_crops: uniqueCrops.toString(),
+      evergreen_chip_level: evergreenChipLevel.toString(),
       mode: mode,
       setup_mode: setupMode,
       sell_mode: sellMode,
@@ -332,8 +363,10 @@ export default function Home() {
     useInfiniVacuum,
     useDarkCacao,
     hyperchargeLevel,
-    ghUpgrade,
+    ghYieldUpgrade,
+    ghSpeedUpgrade,
     uniqueCrops,
+    evergreenChipLevel,
     mode,
     setupMode,
     sellMode,
@@ -400,6 +433,7 @@ export default function Home() {
       plots: "border-emerald-500/30 bg-emerald-500/10 text-emerald-100",
       garden: "border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-100",
       unique: "border-sky-500/30 bg-sky-500/10 text-sky-100",
+      evergreen: "border-teal-500/30 bg-teal-500/10 text-teal-100",
       wart: "border-red-500/30 bg-red-500/10 text-red-100",
       fortune: "border-amber-500/30 bg-amber-500/10 text-amber-100",
       special: "border-cyan-500/30 bg-cyan-500/10 text-cyan-100",
@@ -414,8 +448,10 @@ export default function Home() {
     const spotsPerPlot = selectedMutation.breakdown.base_limit;
     const totalSpots = spotsPerPlot * plots;
     const spawnFactor = totalSpots > 0 ? math.limit / totalSpots : 1;
+    const evergreenBuff = math.evergreen_buff ?? 0;
     const isPlainMutationMath =
       math.base === 1 &&
+      evergreenBuff === 0 &&
       math.gh_buff === 0 &&
       math.unique_buff === 0 &&
       math.wart_buff === 1 &&
@@ -432,12 +468,15 @@ export default function Home() {
     }
 
     if (!isPlainMutationMath) {
-      steps.push({ label: "Base Garden Multiplier", value: formatPreciseValue(1.6), tone: "neutral" });
+      steps.push({ label: "Base Yield", value: formatPreciseValue(1.0), tone: "neutral" });
+      if (evergreenBuff !== 0) {
+        steps.push({ label: "Evergreen Chip", value: `+${formatPreciseValue(evergreenBuff)}`, tone: "evergreen" });
+      }
       if (math.gh_buff !== 0) {
-        steps.push({ label: "Garden Buff", value: `+${formatPreciseValue(math.gh_buff)}`, tone: "garden" });
+        steps.push({ label: "Greenhouse Yield", value: `+${formatPreciseValue(math.gh_buff)}`, tone: "garden" });
       }
       if (math.unique_buff !== 0) {
-        steps.push({ label: "Unique Crop Buff", value: `+${formatPreciseValue(math.unique_buff)}`, tone: "unique" });
+        steps.push({ label: "Unique Crops", value: `+${formatPreciseValue(math.unique_buff)}`, tone: "unique" });
       }
       steps.push({ label: "Wart Boost", value: formatPreciseValue(math.wart_buff), tone: "wart" });
       steps.push({ label: "Fortune Multiplier", value: formatPreciseValue(math.fortune), tone: "fortune" });
@@ -453,7 +492,7 @@ export default function Home() {
   };
 
   const showsAdditiveGardenBreakdown = (math?: YieldMath) =>
-    Boolean(math && (math.gh_buff !== 0 || math.unique_buff !== 0));
+    Boolean(math && ((math.evergreen_buff ?? 0) !== 0 || math.gh_buff !== 0 || math.unique_buff !== 0));
 
   const missingCrops = mode === "smart" ? (data?.metadata.missing_crops ?? []) : [];
   const activeSmartTab = missingCrops.includes(smartTab) ? smartTab : "all";
@@ -635,171 +674,222 @@ export default function Home() {
 
             <hr className="my-6 border-neutral-100 dark:border-neutral-800" />
 
-            {/* Plots Slider */}
-            <div className="mb-6">
-              <label className="flex justify-between text-sm font-medium mb-2">
-                <span>Number of Plots</span>
-                <span className="text-emerald-600 dark:text-emerald-400">{plots}</span>
-              </label>
-              <input
-                type="range"
-                min="1"
-                max="3"
-                value={plots}
-                onChange={(e) => setPlots(Number(e.target.value))}
-                className="w-full accent-emerald-500"
-              />
-            </div>
-
-            {/* Farming Fortune Slider */}
-            <div className="mb-6">
-              <label className="flex justify-between items-center text-sm font-medium mb-2">
-                <span>Farming Fortune</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="4000"
-                  value={fortune}
-                  onChange={(e) => {
-                    const next = Number(e.target.value);
-                    setFortune(Math.max(0, Math.min(4000, Number.isFinite(next) ? next : 0)));
-                  }}
-                  className="w-24 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1 text-right text-emerald-600 dark:text-emerald-400"
-                />
-              </label>
-              <input
-                type="range"
-                min="0"
-                max="4000"
-                step="50"
-                value={fortune}
-                onChange={(e) => setFortune(Number(e.target.value))}
-                className="w-full accent-emerald-500"
-              />
-              {data?.metadata.fortune_breakdown && (
-                <p className="mt-2 text-xs text-emerald-700 dark:text-emerald-300">
-                  Effective Fortune: {Math.round(data.metadata.fortune_breakdown.effective_fortune)} (+{Math.round(data.metadata.fortune_breakdown.bonus_total)})
-                </p>
-              )}
-            </div>
-
-            <div className="mb-6 rounded-xl border border-neutral-200 dark:border-neutral-800 p-3 space-y-3">
-              <p className="text-sm font-medium">Fortune Buffs</p>
-
-              <div className="rounded-xl border border-red-200/80 bg-red-50/70 p-3 dark:border-red-900/40 dark:bg-red-950/20">
-                <label className="flex items-start justify-between gap-3">
-                  <span className="min-w-0">
-                    <span className="inline-flex items-center gap-2 text-xs font-semibold text-red-700 dark:text-red-300">
-                      Improved Harvest Boost (Wart Buff)
-                      <span className="group relative inline-flex">
-                        <button
-                          type="button"
-                          tabIndex={0}
-                          aria-label="Improved Harvest Boost info"
-                          onClick={(e) => e.preventDefault()}
-                          className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-red-400/60 text-[10px] leading-none"
-                        >
-                          <Info className="h-3 w-3" />
-                        </button>
-                        <span className="absolute left-1/2 top-full z-20 mt-2 w-56 -translate-x-1/2 rounded bg-neutral-900 px-3 py-2 text-left text-[11px] font-normal normal-case tracking-normal text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-                          Applies the Nether Wart farming multiplier.
-                        </span>
-                      </span>
-                    </span>
-                    <span className="mt-1 block text-[11px] text-red-600/80 dark:text-red-300/80">
-                      Current wart boost: {useImprovedHarvestBoost ? "1.30x" : "1.00x"}
-                    </span>
-                  </span>
-                  <input type="checkbox" checked={useImprovedHarvestBoost} onChange={(e) => setUseImprovedHarvestBoost(e.target.checked)} className="mt-0.5 accent-red-500" />
-                </label>
-              </div>
-
-              <label className="flex items-center justify-between gap-3">
-                <span className="inline-flex items-center gap-2 text-xs">
-                  <Image src="/icons/buffs/harvest-harbinger-potion.png" alt="Harvest Harbinger Potion" width={20} height={20} className="w-5 h-5 rounded-sm" />
-                  Harvest Harbinger (+50, unaffected)
-                </span>
-                <input type="checkbox" checked={useHarvestHarbinger} onChange={(e) => setUseHarvestHarbinger(e.target.checked)} className="accent-emerald-500" />
-              </label>
-
-              <label className="flex items-center justify-between gap-3">
-                <span className="inline-flex items-center gap-2 text-xs">
-                  <Image src="/icons/buffs/infini-vacuum-hooverius.png" alt="InfiniVacuum Hooverius" width={20} height={20} className="w-5 h-5 rounded-sm" />
-                  Pest Buff (+200)
-                </span>
-                <input type="checkbox" checked={useInfiniVacuum} onChange={(e) => setUseInfiniVacuum(e.target.checked)} className="accent-emerald-500" />
-              </label>
-
-              <label className="flex items-center justify-between gap-3">
-                <span className="inline-flex items-center gap-2 text-xs">
-                  <Image src="/icons/buffs/refined-dark-cacao-truffle.png" alt="Refined Dark Cacao Truffle" width={20} height={20} className="w-5 h-5 rounded-sm" />
-                  Refined Dark Cacao Truffle (+30, affected)
-                </span>
-                <input type="checkbox" checked={useDarkCacao} onChange={(e) => setUseDarkCacao(e.target.checked)} className="accent-emerald-500" />
-              </label>
-
-              <div>
-                <label className="flex items-center justify-between text-xs mb-1">
-                  <span className="inline-flex items-center gap-2">
-                    <Image src="/icons/buffs/hypercharge-chip.png" alt="Hypercharge Chip" width={20} height={20} className="w-5 h-5 rounded-sm" />
-                    Hypercharge Chip Level (0-20)
-                  </span>
-                  <span className="text-emerald-600 dark:text-emerald-400">{hyperchargeLevel}</span>
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/50 p-4 dark:border-emerald-900/40 dark:bg-emerald-950/15">
+                <label className="flex justify-between text-sm font-medium mb-2">
+                  <span>Number of Plots</span>
+                  <span className="text-emerald-600 dark:text-emerald-400">{plots}</span>
                 </label>
                 <input
                   type="range"
-                  min="0"
-                  max="20"
-                  step="1"
-                  value={hyperchargeLevel}
-                  onChange={(e) => setHyperchargeLevel(Number(e.target.value))}
+                  min="1"
+                  max="3"
+                  value={plots}
+                  onChange={(e) => setPlots(Number(e.target.value))}
                   className="w-full accent-emerald-500"
                 />
-                <p className="text-[11px] text-neutral-500 mt-1">Hypercharge only scales affected buffs (Vacuum + Dark Cacao), up to +100% at level 20.</p>
               </div>
-            </div>
 
-            {/* Greenhouse Upgrade Slider */}
-            <div className="mb-6">
-              <label className="flex justify-between text-sm font-medium mb-2">
-                <span>Greenhouse Upgrades</span>
-                <span className="text-emerald-600 dark:text-emerald-400">{ghUpgrade}/9</span>
-              </label>
-              <input
-                type="range"
-                min="0"
-                max="9"
-                value={ghUpgrade}
-                onChange={(e) => setGhUpgrade(Number(e.target.value))}
-                className="w-full accent-emerald-500"
-              />
-            </div>
+              <div className="rounded-2xl border border-rose-200/80 bg-rose-50/40 p-4 space-y-4 dark:border-rose-900/40 dark:bg-rose-950/10">
+                <div>
+                  <label className="flex justify-between text-sm font-medium mb-2">
+                    <span>Greenhouse Yield Upgrade</span>
+                    <span className="text-fuchsia-600 dark:text-fuchsia-400">{ghYieldUpgrade}/9</span>
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="9"
+                    value={ghYieldUpgrade}
+                    onChange={(e) => setGhYieldUpgrade(Number(e.target.value))}
+                    className="w-full accent-fuchsia-500"
+                  />
+                  <p className="mt-2 text-[11px] text-neutral-500 dark:text-neutral-400">
+                    Adds up to +20% greenhouse yield at 9/9.
+                  </p>
+                </div>
 
-            {/* Unique Crops Slider */}
-            <div className="mb-4">
-              <label className="flex justify-between text-sm font-medium mb-2">
-                <span>Unique Crops Placed</span>
-                <span className="text-emerald-600 dark:text-emerald-400">{uniqueCrops}/12</span>
-              </label>
-              <input
-                type="range"
-                min="0"
-                max="12"
-                value={uniqueCrops}
-                onChange={(e) => setUniqueCrops(Number(e.target.value))}
-                className="w-full accent-emerald-500"
-              />
-            </div>
+                <div>
+                  <label className="flex justify-between items-center text-sm font-medium mb-2">
+                    <span className="inline-flex items-center gap-2">
+                      <Image src="/icons/settings/seeds.svg" alt="Seeds" width={20} height={20} className="w-5 h-5 rounded-md" />
+                      Unique Crops Placed
+                    </span>
+                    <span className="text-sky-600 dark:text-sky-400">{uniqueCrops}/12</span>
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="12"
+                    value={uniqueCrops}
+                    onChange={(e) => setUniqueCrops(Number(e.target.value))}
+                    className="w-full accent-sky-500"
+                  />
+                </div>
 
-            {data && (
-              <div className="mt-8 pt-6 border-t border-neutral-200 dark:border-neutral-800">
-                <p className="text-sm text-neutral-500 dark:text-neutral-400">Cycle Time</p>
-                <div className="flex items-center gap-2 mt-1 font-mono text-lg font-medium text-amber-600 dark:text-amber-400">
-                  <Clock className="w-5 h-5" />
-                  {formatDuration(data.metadata.cycle_time_hours)}
+                <div className="rounded-xl border border-neutral-200/80 bg-white/80 p-3 dark:border-neutral-800 dark:bg-neutral-900/70">
+                  <label className="flex items-start justify-between gap-3">
+                    <span className="min-w-0">
+                      <span className="inline-flex items-center gap-2 text-sm font-medium text-neutral-800 dark:text-neutral-100">
+                        <Image src="/icons/settings/nether-wart.svg" alt="Nether Wart" width={20} height={20} className="w-5 h-5 rounded-md" />
+                        Improved Harvest Boost (Wart Buff)
+                        <span className="group relative inline-flex">
+                          <button
+                            type="button"
+                            tabIndex={0}
+                            aria-label="Improved Harvest Boost info"
+                            onClick={(e) => e.preventDefault()}
+                            className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-neutral-300 text-[10px] leading-none text-neutral-500 dark:border-neutral-700 dark:text-neutral-400"
+                          >
+                            <Info className="h-3 w-3" />
+                          </button>
+                          <span className="absolute left-1/2 top-full z-20 mt-2 w-56 -translate-x-1/2 rounded bg-neutral-900 px-3 py-2 text-left text-[11px] font-normal normal-case tracking-normal text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                            Applies the Nether Wart farming multiplier.
+                          </span>
+                        </span>
+                      </span>
+                      <span className="mt-1 block text-[11px] text-neutral-500 dark:text-neutral-400">
+                        Current wart boost: {useImprovedHarvestBoost ? "1.30x" : "1.00x"}
+                      </span>
+                    </span>
+                    <input type="checkbox" checked={useImprovedHarvestBoost} onChange={(e) => setUseImprovedHarvestBoost(e.target.checked)} className="mt-0.5 accent-emerald-500" />
+                  </label>
+                </div>
+
+                <div>
+                  <label className="flex justify-between items-center text-sm font-medium mb-2">
+                    <span className="inline-flex items-center gap-2">
+                      <Image src="/icons/settings/evergreen-chip.svg" alt="Evergreen Chip" width={20} height={20} className="w-5 h-5 rounded-md" />
+                      Evergreen Chip Level
+                    </span>
+                    <span className="text-teal-600 dark:text-teal-400">{evergreenChipLevel}/20</span>
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="20"
+                    step="1"
+                    value={evergreenChipLevel}
+                    onChange={(e) => setEvergreenChipLevel(Number(e.target.value))}
+                    className="w-full accent-teal-500"
+                  />
+                  <p className="mt-2 text-[11px] text-neutral-500 dark:text-neutral-400">
+                    Adds up to +60% more base crops at 20/20.
+                  </p>
                 </div>
               </div>
-            )}
+
+              <div className="rounded-2xl border border-amber-200/80 bg-amber-50/40 p-4 space-y-4 dark:border-amber-900/40 dark:bg-amber-950/10">
+                <div>
+                  <label className="flex justify-between items-center text-sm font-medium mb-2">
+                    <span>Farming Fortune</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="4000"
+                      value={fortune}
+                      onChange={(e) => {
+                        const next = Number(e.target.value);
+                        setFortune(Math.max(0, Math.min(4000, Number.isFinite(next) ? next : 0)));
+                      }}
+                      className="w-24 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1 text-right text-amber-600 dark:text-amber-400"
+                    />
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="4000"
+                    step="50"
+                    value={fortune}
+                    onChange={(e) => setFortune(Number(e.target.value))}
+                    className="w-full accent-amber-500"
+                  />
+                  {data?.metadata.fortune_breakdown && (
+                    <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                      Effective Fortune: {Math.round(data.metadata.fortune_breakdown.effective_fortune)} (+{Math.round(data.metadata.fortune_breakdown.bonus_total)})
+                    </p>
+                  )}
+                </div>
+
+                <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 p-3 space-y-3 bg-white/70 dark:bg-neutral-900/60">
+                  <p className="text-sm font-medium">Fortune Buffs</p>
+
+                  <label className="flex items-center justify-between gap-3">
+                    <span className="inline-flex items-center gap-2 text-xs">
+                      <Image src="/icons/buffs/harvest-harbinger-potion.png" alt="Harvest Harbinger Potion" width={20} height={20} className="w-5 h-5 rounded-sm" />
+                      Harvest Harbinger (+50, unaffected)
+                    </span>
+                    <input type="checkbox" checked={useHarvestHarbinger} onChange={(e) => setUseHarvestHarbinger(e.target.checked)} className="accent-amber-500" />
+                  </label>
+
+                  <label className="flex items-center justify-between gap-3">
+                    <span className="inline-flex items-center gap-2 text-xs">
+                      <Image src="/icons/buffs/infini-vacuum-hooverius.png" alt="InfiniVacuum Hooverius" width={20} height={20} className="w-5 h-5 rounded-sm" />
+                      Pest Buff (+200)
+                    </span>
+                    <input type="checkbox" checked={useInfiniVacuum} onChange={(e) => setUseInfiniVacuum(e.target.checked)} className="accent-amber-500" />
+                  </label>
+
+                  <label className="flex items-center justify-between gap-3">
+                    <span className="inline-flex items-center gap-2 text-xs">
+                      <Image src="/icons/buffs/refined-dark-cacao-truffle.png" alt="Refined Dark Cacao Truffle" width={20} height={20} className="w-5 h-5 rounded-sm" />
+                      Refined Dark Cacao Truffle (+30, affected)
+                    </span>
+                    <input type="checkbox" checked={useDarkCacao} onChange={(e) => setUseDarkCacao(e.target.checked)} className="accent-amber-500" />
+                  </label>
+
+                  <div>
+                    <label className="flex items-center justify-between text-xs mb-1">
+                      <span className="inline-flex items-center gap-2">
+                        <Image src="/icons/buffs/hypercharge-chip.png" alt="Hypercharge Chip" width={20} height={20} className="w-5 h-5 rounded-sm" />
+                        Hypercharge Chip Level (0-20)
+                      </span>
+                      <span className="text-amber-600 dark:text-amber-400">{hyperchargeLevel}</span>
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="20"
+                      step="1"
+                      value={hyperchargeLevel}
+                      onChange={(e) => setHyperchargeLevel(Number(e.target.value))}
+                      className="w-full accent-amber-500"
+                    />
+                    <p className="text-[11px] text-neutral-500 mt-1">Hypercharge only scales affected buffs (Vacuum + Dark Cacao), up to +100% at level 20.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-sky-200/80 bg-sky-50/40 p-4 space-y-4 dark:border-sky-900/40 dark:bg-sky-950/10">
+                <div>
+                  <label className="flex justify-between text-sm font-medium mb-2">
+                    <span>Greenhouse Speed Upgrade</span>
+                    <span className="text-sky-600 dark:text-sky-400">{ghSpeedUpgrade}/9</span>
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="9"
+                    value={ghSpeedUpgrade}
+                    onChange={(e) => setGhSpeedUpgrade(Number(e.target.value))}
+                    className="w-full accent-sky-500"
+                  />
+                  <p className="mt-2 text-[11px] text-neutral-500 dark:text-neutral-400">
+                    Controls the greenhouse cycle-time bonus used for lifecycle estimates.
+                  </p>
+                </div>
+
+                {data && (
+                  <div className="rounded-xl border border-white/80 bg-white/75 px-4 py-3 dark:border-neutral-800 dark:bg-neutral-900/70">
+                    <p className="text-sm text-neutral-500 dark:text-neutral-400">Cycle Time</p>
+                    <div className="mt-1 flex items-center gap-2 font-mono text-lg font-medium text-sky-700 dark:text-sky-300">
+                      <Clock className="w-5 h-5" />
+                      {formatDuration(data.metadata.cycle_time_hours)}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </aside>
 
@@ -1324,7 +1414,7 @@ export default function Home() {
                                     </div>
                                     {showsAdditiveGardenBreakdown(yld.math) && (
                                       <p className="text-[11px] text-neutral-400">
-                                        1.60 garden base plus upgrade buffs
+                                        Yield bonuses stack before wart, fortune, and special multipliers
                                       </p>
                                     )}
                                   </div>
