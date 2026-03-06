@@ -2,7 +2,7 @@
 
 import { Fragment, useState, useEffect, useMemo, useRef } from "react";
 import { ModeToggle } from "@/components/mode-toggle";
-import { Coins, Sprout, Clock, Calculator, Loader2, ArrowUpRight, AlertTriangle, X, Info, Package, TrendingUp, Sparkles } from "lucide-react";
+import { Coins, Sprout, Clock, Calculator, Loader2, ArrowUpRight, AlertTriangle, X, Info, Sparkles } from "lucide-react";
 import Image from "next/image";
 
 type OptimizationMode = "profit" | "smart" | "target";
@@ -637,14 +637,12 @@ export default function Home() {
   const selectedMutationNetProfit = selectedMutation
     ? selectedMutation.breakdown.total_revenue - selectedMutation.breakdown.total_setup_cost
     : 0;
-  const selectedMutationCycleDuration = data ? formatDuration(data.metadata.cycle_time_hours) : "0m";
   const selectedMutationGrowthCycles = selectedMutation
     ? formatGrowthCyclesDisplay(selectedMutation.hourly?.g ?? selectedMutation.breakdown.growth_stages)
     : "0";
   const selectedMutationLifecycle = selectedMutation
     ? formatDuration(selectedMutation.breakdown.estimated_time_hours)
     : "0m";
-  const selectedMutationYieldCount = selectedMutation?.breakdown.yields.length ?? 0;
 
 
 
@@ -1378,7 +1376,7 @@ export default function Home() {
                         Harvest snapshot, setup cost, and expected value for {plots} placed plot{plots > 1 ? "s" : ""}.
                       </p>
                     </div>
-                    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+                    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                       <div className="rounded-2xl border border-emerald-200/70 bg-emerald-50/80 px-4 py-3 dark:border-emerald-900/50 dark:bg-emerald-950/25">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">Total Placed</p>
                         <p className="mt-1 text-lg font-black text-neutral-950 dark:text-white">{selectedMutation.limit}</p>
@@ -1391,13 +1389,9 @@ export default function Home() {
                         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-700 dark:text-cyan-300">Lifecycle</p>
                         <p className="mt-1 text-lg font-black text-neutral-950 dark:text-white">{selectedMutationLifecycle}</p>
                       </div>
-                      <div className="rounded-2xl border border-violet-200/70 bg-violet-50/80 px-4 py-3 dark:border-violet-900/50 dark:bg-violet-950/25">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-violet-700 dark:text-violet-300">Distinct Drops</p>
-                        <p className="mt-1 text-lg font-black text-neutral-950 dark:text-white">{selectedMutationYieldCount}</p>
-                      </div>
-                      <div className="rounded-2xl border border-neutral-200/80 bg-white/80 px-4 py-3 dark:border-neutral-700 dark:bg-neutral-900/70">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-500 dark:text-neutral-400">Garden Cycle</p>
-                        <p className="mt-1 text-lg font-black text-neutral-950 dark:text-white">~{selectedMutationCycleDuration}</p>
+                      <div className="rounded-2xl border border-amber-200/70 bg-amber-50/80 px-4 py-3 dark:border-amber-900/50 dark:bg-amber-950/25">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-300">Setup Cost</p>
+                        <p className="mt-1 text-base font-black font-mono text-neutral-950 dark:text-white">{formatCoins(selectedMutation.breakdown.total_setup_cost)}</p>
                       </div>
                     </div>
                   </div>
@@ -1408,66 +1402,9 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="relative overflow-y-auto px-6 py-6 custom-scrollbar sm:px-8 lg:px-10">
-              <div className="grid gap-3 xl:grid-cols-3">
-                <div className="rounded-2xl border border-amber-200/70 bg-gradient-to-br from-amber-50 via-white to-white p-4 shadow-sm dark:border-amber-900/40 dark:from-amber-950/30 dark:via-neutral-900 dark:to-neutral-900">
-                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-300">
-                    <Package className="h-4 w-4" />
-                    Setup Cost
-                  </div>
-                  <div className="mt-3 text-2xl font-black font-mono text-amber-600 dark:text-amber-300">
-                    {formatCoins(selectedMutation.breakdown.total_setup_cost)}
-                  </div>
-                  <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">One-time ingredient spend for this placement plan.</p>
-                </div>
-                <div className="rounded-2xl border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-white p-4 shadow-sm dark:border-emerald-900/40 dark:from-emerald-950/30 dark:via-neutral-900 dark:to-neutral-900">
-                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
-                    <Coins className="h-4 w-4" />
-                    Batch Revenue
-                  </div>
-                  <div className="mt-3 text-2xl font-black font-mono text-emerald-600 dark:text-emerald-300">
-                    +{formatCoins(selectedMutation.breakdown.total_revenue)}
-                  </div>
-                  <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">Expected total value when the batch is harvested.</p>
-                </div>
-                <div className={`rounded-2xl border p-4 shadow-sm ${selectedMutationNetProfit >= 0
-                  ? "border-emerald-300/70 bg-gradient-to-br from-emerald-500 via-emerald-500 to-teal-500 text-white shadow-emerald-500/20"
-                  : "border-red-300/70 bg-gradient-to-br from-red-500 via-red-500 to-rose-500 text-white shadow-red-500/20"
-                  }`}>
-                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/80">
-                    <TrendingUp className="h-4 w-4" />
-                    Net / Harvest
-                  </div>
-                  <div className="mt-3 text-2xl font-black font-mono">
-                    {formatSignedCoins(selectedMutationNetProfit)}
-                  </div>
-                  <p className="mt-1 text-xs text-white/75">Revenue minus setup cost for one full harvest batch.</p>
-                </div>
-              </div>
-
-              <div className="mt-6 grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)] 2xl:grid-cols-[400px_minmax(0,1fr)]">
+            <div className="relative overflow-y-auto px-6 py-5 custom-scrollbar sm:px-8 lg:px-10">
+              <div className="grid gap-5 xl:grid-cols-[320px_minmax(0,1fr)] 2xl:grid-cols-[360px_minmax(0,1fr)]">
                 <section className="space-y-4">
-                  <div className="rounded-3xl border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-emerald-50/60 p-5 shadow-sm dark:border-emerald-900/40 dark:from-emerald-950/20 dark:via-neutral-900 dark:to-neutral-900">
-                    <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
-                      <Sprout className="h-4 w-4" />
-                      Placement Plan
-                    </div>
-                    <p className="mt-4 text-sm leading-6 text-neutral-700 dark:text-neutral-200">
-                      You can plant <span className="font-bold text-emerald-700 dark:text-emerald-300">{selectedMutation.breakdown.base_limit}x {toMutationLabel(selectedMutation.mutationName)}</span> in one plot.
-                      With {plots} plot{plots > 1 ? "s" : ""}, that becomes <span className="font-bold text-neutral-950 dark:text-white">{selectedMutation.limit} total placements</span>{selectedMutation.breakdown.ingredients.length === 0 ? ", with no setup ingredients required." : "."}
-                    </p>
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-2xl border border-white/70 bg-white/80 p-3 dark:border-neutral-800 dark:bg-neutral-900/70">
-                        <p className="text-[11px] uppercase tracking-[0.2em] text-neutral-400">Per Plot</p>
-                        <p className="mt-1 text-lg font-black text-neutral-900 dark:text-white">{selectedMutation.breakdown.base_limit}x</p>
-                      </div>
-                      <div className="rounded-2xl border border-white/70 bg-white/80 p-3 dark:border-neutral-800 dark:bg-neutral-900/70">
-                        <p className="text-[11px] uppercase tracking-[0.2em] text-neutral-400">Across All Plots</p>
-                        <p className="mt-1 text-lg font-black text-neutral-900 dark:text-white">{selectedMutation.limit}x</p>
-                      </div>
-                    </div>
-                  </div>
-
                   {selectedMutation.mutationName === "Devourer" && (
                     <div className="rounded-3xl border border-red-200/80 bg-gradient-to-br from-red-50 via-white to-red-50/50 p-5 shadow-sm dark:border-red-900/40 dark:from-red-950/30 dark:via-neutral-900 dark:to-neutral-900">
                       <div className="flex items-start gap-3">
@@ -1531,18 +1468,15 @@ export default function Home() {
                         <h4 className="mt-2 text-lg font-bold text-neutral-950 dark:text-white">Yield Breakdown</h4>
                         <p className="text-sm text-neutral-500 dark:text-neutral-400">Amounts, value, and the exact formula used for each drop.</p>
                       </div>
-                      <span className="rounded-full border border-neutral-200 bg-white px-3 py-1 text-xs font-semibold text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300">
-                        {selectedMutationYieldCount} Distinct Drop{selectedMutationYieldCount === 1 ? "" : "s"}
-                      </span>
                     </div>
 
                     {(selectedMutation.mutationName === "Magic Jellybean" || selectedMutation.mutationName === "All-in Aloe") && (
-                      <div className="mb-4 rounded-2xl border border-sky-400/20 bg-white/70 p-4 dark:border-sky-500/20 dark:bg-sky-950/20">
+                      <div className="mb-3 rounded-2xl border border-sky-400/20 bg-white/70 p-3 dark:border-sky-500/20 dark:bg-sky-950/20">
                         <div className="flex items-start gap-3">
                           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-sky-600 dark:text-sky-300" />
                           <p className="text-sm leading-6 text-sky-800 dark:text-sky-200">
                             {selectedMutation.mutationName === "Magic Jellybean"
-                              ? "Magic Jellybean is exceptionally rare and has 120 growth stages, so it takes much longer than standard mutations to mature."
+                              ? "Magic Jellybean has 120 growth stages. It is best to harvest when its fully grown so you waste less time waiting for spawns."
                               : "All-in Aloe is evaluated at Stage 14 because that is the best expected harvest window. The raw stage multiplier there is 60x, but the calculator uses the reset-adjusted expected multiplier of 9.37x."}
                           </p>
                         </div>
@@ -1552,51 +1486,49 @@ export default function Home() {
                     {selectedMutation.breakdown.yields && selectedMutation.breakdown.yields.length > 0 ? (
                       <div className="space-y-3">
                         {selectedMutation.breakdown.yields.map((yld) => (
-                          <div key={yld.name} className="rounded-2xl border border-neutral-200/70 bg-gradient-to-br from-white via-white to-neutral-50 p-4 shadow-sm dark:border-neutral-800 dark:from-neutral-950 dark:via-neutral-950 dark:to-neutral-900">
-                            <div className="grid gap-4 xl:grid-cols-[minmax(0,0.7fr)_minmax(0,1.4fr)_220px] xl:items-center">
+                          <div key={yld.name} className="rounded-2xl border border-neutral-200/70 bg-gradient-to-br from-white via-white to-neutral-50 p-3 shadow-sm dark:border-neutral-800 dark:from-neutral-950 dark:via-neutral-950 dark:to-neutral-900">
+                            <div className="grid gap-3 lg:grid-cols-[minmax(0,0.65fr)_minmax(0,1.45fr)_170px] lg:items-center">
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-400">
                                   <Sparkles className="h-3.5 w-3.5" />
                                   Expected yield
                                 </div>
-                                <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                                  <span className="text-2xl font-black tracking-tight text-neutral-950 dark:text-white">{formatCoins(yld.amount)}x</span>
-                                  <span className="text-xl font-semibold text-emerald-700 dark:text-emerald-300">{toCropLabel(yld.name)}</span>
+                                <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                                  <span className="text-xl font-black tracking-tight text-neutral-950 dark:text-white">{formatCoins(yld.amount)}x</span>
+                                  <span className="text-lg font-semibold text-emerald-700 dark:text-emerald-300">{toCropLabel(yld.name)}</span>
                                 </div>
                               </div>
                               {yld.math && (
-                                <div className="rounded-2xl border border-neutral-200/80 bg-neutral-950 px-3 py-3 text-[11px] shadow-inner dark:border-neutral-700">
-                                  <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-400">
+                                <div className="rounded-2xl border border-neutral-200/80 bg-neutral-950 px-3 py-2.5 text-[11px] shadow-inner dark:border-neutral-700">
+                                  <div className="flex flex-wrap items-center justify-between gap-1.5">
+                                    <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-400">
                                       Calculation Breakdown
                                     </div>
                                     {showsAdditiveGardenBreakdown(yld.math) && (
-                                      <p className="text-[11px] text-neutral-400">
-                                        Yield bonuses stack before wart, fortune, and special multipliers
+                                      <p className="text-[10px] text-neutral-500">
+                                        Yield bonuses stack before wart, fortune, and special
                                       </p>
                                     )}
                                   </div>
-                                  <div className="mt-3 overflow-x-auto pb-1">
-                                    <div className="flex min-w-max items-center gap-2">
+                                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
                                       {getYieldCalculationSteps(yld).map((step, index) => (
                                         <Fragment key={`${yld.name}-${step.label}`}>
-                                          {index > 0 && <span className="text-sm font-black text-neutral-500">×</span>}
-                                          <div className={`rounded-xl border px-3 py-2 ${getCalculationToneClasses(step.tone)}`}>
-                                            <div className="flex items-center gap-2 whitespace-nowrap">
-                                              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] opacity-70">{step.label}</p>
-                                              <p className="font-mono text-sm font-black">{step.value}</p>
+                                          {index > 0 && <span className="text-xs font-black text-neutral-500">×</span>}
+                                          <div className={`rounded-lg border px-2 py-1.5 ${getCalculationToneClasses(step.tone)}`}>
+                                            <div className="flex flex-wrap items-center gap-1 whitespace-normal">
+                                              <p className="text-[9px] font-semibold uppercase tracking-[0.12em] opacity-70">{step.label}</p>
+                                              <p className="font-mono text-[11px] font-black">{step.value}</p>
                                             </div>
                                           </div>
                                         </Fragment>
                                       ))}
-                                    </div>
                                   </div>
                                 </div>
                               )}
-                              <div className="shrink-0 rounded-2xl border border-emerald-300/20 bg-emerald-500/10 px-4 py-3 text-right dark:border-emerald-500/20 dark:bg-emerald-500/10">
+                              <div className="shrink-0 rounded-2xl border border-emerald-300/20 bg-emerald-500/10 px-3 py-2.5 text-right dark:border-emerald-500/20 dark:bg-emerald-500/10">
                                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">Value</div>
-                                <div className="mt-1 text-2xl font-black font-mono text-emerald-600 dark:text-emerald-300">{formatCoins(yld.total_value)}</div>
-                                <div className="mt-0.5 text-[11px] font-mono text-neutral-500 dark:text-neutral-400">{formatCoins(yld.unit_price)} each</div>
+                                <div className="mt-1 text-xl font-black font-mono text-emerald-600 dark:text-emerald-300">{formatCoins(yld.total_value)}</div>
+                                <div className="mt-0.5 text-[10px] font-mono text-neutral-500 dark:text-neutral-400">{formatCoins(yld.unit_price)} each</div>
                               </div>
                             </div>
                           </div>
