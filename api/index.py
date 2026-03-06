@@ -337,7 +337,8 @@ def get_leaderboard(
             spawn_fill_fraction = 1.0 - ((1.0 - mutation_chance_effective) ** growth_stages)
         effective_limit = limit * spawn_fill_fraction
             
-        estimated_time = growth_stages * cycle_time_hours
+        # Even instant-after-spawn mutations still need one garden cycle to realize value in practice.
+        estimated_time = max(1, growth_stages) * cycle_time_hours
         
         yields = []
         

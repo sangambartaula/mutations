@@ -71,6 +71,7 @@ class LeaderboardTests(unittest.TestCase):
         veil = next((m for m in result["leaderboard"] if m["mutationName"] == "Veilshroom"), None)
         self.assertIsNotNone(veil)
         self.assertEqual(veil["breakdown"]["growth_stages"], 0)
+        self.assertAlmostEqual(veil["breakdown"]["estimated_time_hours"], result["metadata"]["cycle_time_hours"], places=6)
 
     @patch("api.index.get_bazaar_prices", return_value={})
     def test_profit_per_hour_uses_renewal_model_output(self, _mock_prices):
