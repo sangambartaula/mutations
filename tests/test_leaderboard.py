@@ -246,7 +246,7 @@ class LeaderboardTests(unittest.TestCase):
         self.assertEqual(ingredient_amounts.get("Brown Mushroom"), 3)
 
     @patch("api.index.get_bazaar_prices", return_value={})
-    def test_growth_stages_allow_zero_for_instant_mutations(self, _mock_prices):
+    def test_veilshroom_matches_other_one_cycle_common_mutations(self, _mock_prices):
         result = get_leaderboard(
             plots=3,
             fortune=2500,
@@ -260,10 +260,14 @@ class LeaderboardTests(unittest.TestCase):
         )
 
         veil = next((m for m in result["leaderboard"] if m["mutationName"] == "Veilshroom"), None)
+        ashwreath = next((m for m in result["leaderboard"] if m["mutationName"] == "Ashwreath"), None)
         self.assertIsNotNone(veil)
-        self.assertEqual(veil["breakdown"]["growth_stages"], 0)
-        self.assertAlmostEqual(veil["breakdown"]["estimated_time_hours"], 0.0, places=6)
-        expected_hours = (1.0 / DEFAULT_METRIC_SPAWN_CHANCE) * result["metadata"]["cycle_time_hours"]
+        self.assertIsNotNone(ashwreath)
+        self.assertEqual(veil["breakdown"]["growth_stages"], 1)
+        self.assertEqual(ashwreath["breakdown"]["growth_stages"], 1)
+        self.assertAlmostEqual(veil["breakdown"]["estimated_time_hours"], result["metadata"]["cycle_time_hours"], places=6)
+        self.assertAlmostEqual(veil["breakdown"]["estimated_time_hours"], ashwreath["breakdown"]["estimated_time_hours"], places=6)
+        expected_hours = ((1.0 / DEFAULT_METRIC_SPAWN_CHANCE) + 1.0) * result["metadata"]["cycle_time_hours"]
         self.assertAlmostEqual(veil["hourly"]["expected_hours"], expected_hours, places=6)
 
     @patch("api.index.get_bazaar_prices", return_value={})
