@@ -148,6 +148,8 @@ const toMutationIconPath = (mutationName: string) =>
   `/icons/mutations/${mutationName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}.png`;
 const setupCostNote = "Some mutations decay after a few days, so setup cost may recur.";
 const getLeaderboardWarningTone = (item: LeaderboardItem) => {
+  const hasMechanicalWarning = item.warning_messages?.some((message) => !message.startsWith("Market spreads")) ?? false;
+
   if (item.mutationName === "Devourer") {
     return {
       label: "Devourer warning",
@@ -158,8 +160,18 @@ const getLeaderboardWarningTone = (item: LeaderboardItem) => {
     };
   }
 
+  if (hasMechanicalWarning) {
+    return {
+      label: "Mutation warning",
+      icon: "text-red-500 hover:text-red-400",
+      panel: "border-red-500/30 bg-red-950/95 text-red-50",
+      heading: "text-red-200",
+      body: "text-red-100/90",
+    };
+  }
+
   return {
-    label: "Warning",
+    label: "Market warning",
     icon: "text-yellow-500 hover:text-yellow-400",
     panel: "border-amber-500/30 bg-neutral-900 text-white",
     heading: "text-amber-200",
@@ -168,32 +180,33 @@ const getLeaderboardWarningTone = (item: LeaderboardItem) => {
 };
 const faqItems = [
   {
-    question: "What is Profit per Harvest?",
-    answer: "Profit per Harvest is the estimated value of crop drops plus the mutation itself, minus setup cost for the placement plan.",
+    question: "How are profits calculated?",
+    answer: [
+      "Profit per Harvest is the profit from one full planted batch once everything is grown.",
+      "Profit per Growth Cycle adds expected spawn time to the mutation's growth stages. Most mutations use a 25 percent spawn chance per garden growth cycle, so their expected spawn wait is 1 / 0.25 = 4 cycles.",
+      "Lonelily uses its own rarer spawn estimate instead. Profit per Hour then converts those expected cycles into real time using the current garden cycle duration.",
+    ],
   },
   {
-    question: "What is Profit per Growth Cycle?",
-    answer: "Profit per Growth Cycle divides Profit per Harvest by the mutation's growth stages so slower mutations can be compared more fairly. Mutations with 0 growth stages show N/A.",
+    question: "Why do some crops have warning icons?",
+    answer: [
+      "Yellow warnings highlight large Bazaar price spreads, which can make setup cost or revenue estimates swing more than usual.",
+      "Red warnings are used for mutations with unusual mechanics or planting behavior that make real runs less reliable.",
+    ],
   },
   {
-    question: "Where do prices come from?",
-    answer: "The tool uses live Bazaar prices for market items and falls back to fixed NPC prices when an item is sold at a static value.",
+    question: "Why does Devourer have a warning?",
+    answer: [
+      "Devourer spreads to nearby crops and can destroy surrounding plants over time.",
+      "It is technically possible to grow a lot of them at once, but large setups are inconsistent and generally not recommended unless the area is isolated very carefully.",
+    ],
   },
   {
-    question: "Do all mutations use the same spawn assumption?",
-    answer: "Most mutations use the standard full-growth assumption across the planted spots. Lonelily is handled separately with its own backend spawn override, so it is not treated like a normal full-coverage mutation.",
-  },
-  {
-    question: "Why do some rows show warning icons?",
-    answer: "Warnings call out cases where the estimate is less reliable in practice, such as wide market spreads, Devourer spread risk, Magic Jellybean's long maturity, or All-in Aloe's reset behavior.",
-  },
-  {
-    question: "Why does All-in Aloe use 9.37x instead of 60x?",
-    answer: "Stage 14 has a raw 60x multiplier, but the calculator uses the reset-adjusted expected value at that stage, which is 9.37x. That keeps the result aligned with expected harvest value instead of peak best-case value.",
-  },
-  {
-    question: "Which settings change the estimates?",
-    answer: "Plots, greenhouse yield, greenhouse speed, Evergreen Chip level, Unique Crops, Wart Boost, Farming Fortune, harvest-related buffs, and your chosen buy or sell strategy all feed into the final result.",
+    question: "Why does Lonelily behave differently?",
+    answer: [
+      "Lonelily is treated as a much rarer spawn than the standard mutation pool when expected spawn time is calculated.",
+      "Its timing metrics use a dedicated estimated spawn chance so its Profit per Growth Cycle and Profit per Hour do not look unrealistically high.",
+    ],
   },
 ] as const;
 
@@ -1345,30 +1358,36 @@ export default function Home() {
           </div>
 
           <div className="rounded-2xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
-            <details className="group">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 sm:px-6">
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5 rounded-xl bg-sky-100 p-2 text-sky-600 dark:bg-sky-900/30 dark:text-sky-300">
-                    <Info className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-neutral-950 dark:text-white">How are results calculated?</h3>
-                    <p className="text-sm text-neutral-500 dark:text-neutral-400">Open a short guide to the main profit, spawn, and warning assumptions.</p>
-                  </div>
+            <div className="border-b border-neutral-200 px-5 py-4 dark:border-neutral-800 sm:px-6">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 rounded-xl bg-sky-100 p-2 text-sky-600 dark:bg-sky-900/30 dark:text-sky-300">
+                  <Info className="h-4 w-4" />
                 </div>
-                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-400">Open FAQ</span>
-              </summary>
-              <div className="border-t border-neutral-200 px-5 py-5 dark:border-neutral-800 sm:px-6">
-                <div className="grid gap-3 lg:grid-cols-2">
-                  {faqItems.map((item) => (
-                    <div key={item.question} className="rounded-2xl border border-neutral-200/80 bg-neutral-50/80 p-4 dark:border-neutral-800 dark:bg-neutral-950/60">
-                      <h4 className="text-sm font-bold text-neutral-950 dark:text-white">{item.question}</h4>
-                      <p className="mt-2 text-sm leading-6 text-neutral-600 dark:text-neutral-300">{item.answer}</p>
-                    </div>
-                  ))}
+                <div>
+                  <h3 className="text-base font-bold text-neutral-950 dark:text-white">Frequently Asked Questions (FAQ)</h3>
+                  <p className="text-sm text-neutral-500 dark:text-neutral-400">Open each question for the current profit, spawn, and warning rules used by the calculator.</p>
                 </div>
               </div>
-            </details>
+            </div>
+            <div className="px-5 py-4 sm:px-6">
+              <div className="space-y-3">
+                {faqItems.map((item) => (
+                  <details key={item.question} className="group rounded-2xl border border-neutral-200/80 bg-neutral-50/80 dark:border-neutral-800 dark:bg-neutral-950/60">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-4">
+                      <span className="text-sm font-bold text-neutral-950 dark:text-white">{item.question}</span>
+                      <span className="text-lg font-light text-neutral-400 transition-transform group-open:rotate-45">+</span>
+                    </summary>
+                    <div className="border-t border-neutral-200 px-4 py-4 dark:border-neutral-800">
+                      {item.answer.map((paragraph) => (
+                        <p key={paragraph} className="text-sm leading-6 text-neutral-600 dark:text-neutral-300">
+                          {paragraph}
+                        </p>
+                      ))}
+                    </div>
+                  </details>
+                ))}
+              </div>
+            </div>
           </div>
         </main>
       </div>
