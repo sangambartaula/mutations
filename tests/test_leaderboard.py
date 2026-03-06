@@ -262,7 +262,9 @@ class LeaderboardTests(unittest.TestCase):
         veil = next((m for m in result["leaderboard"] if m["mutationName"] == "Veilshroom"), None)
         self.assertIsNotNone(veil)
         self.assertEqual(veil["breakdown"]["growth_stages"], 0)
-        self.assertAlmostEqual(veil["breakdown"]["estimated_time_hours"], result["metadata"]["cycle_time_hours"], places=6)
+        self.assertAlmostEqual(veil["breakdown"]["estimated_time_hours"], 0.0, places=6)
+        expected_hours = (1.0 / DEFAULT_METRIC_SPAWN_CHANCE) * result["metadata"]["cycle_time_hours"]
+        self.assertAlmostEqual(veil["hourly"]["expected_hours"], expected_hours, places=6)
 
     @patch("api.index.get_bazaar_prices", return_value={})
     def test_profit_per_hour_matches_expected_cycle_model(self, _mock_prices):
@@ -315,6 +317,23 @@ class LeaderboardTests(unittest.TestCase):
             self.assertNotIn("profit_per_cycle", mutation["hourly"])
             self.assertNotIn("break_even_cycles", mutation["hourly"])
             self.assertNotIn("break_even_cycles_display", mutation["hourly"])
+
+    @patch("api.index.get_bazaar_prices", return_value={})
+    def test_invalid_string_modes_fall_back_to_safe_defaults(self, _mock_prices):
+        result = get_leaderboard(
+            plots=3,
+            fortune=2500,
+            gh_upgrade=9,
+            unique_crops=12,
+            mode=" definitely-not-valid ",
+            setup_mode="oops",
+            sell_mode="still-nope",
+            target_crop="not-a-real-crop",
+            maxed_crops="Mushroom, Mushroom, nope",
+        )
+
+        self.assertGreater(len(result["leaderboard"]), 0)
+        self.assertEqual(result["metadata"]["missing_crops"].count("Mushroom"), 0)
 
     @patch("api.index.get_bazaar_prices", return_value={})
     def test_special_mutations_expose_warning_messages(self, _mock_prices):

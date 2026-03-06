@@ -4,9 +4,11 @@ import os
 import json
 import time
 import math
+import logging
 from collections import defaultdict, deque
 from threading import Lock
 from typing import Dict, Any, Deque, List
+from urllib.parse import urlparse
 
 from fastapi import FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,13 +20,44 @@ except ImportError:
     from shared_data import NPC_PRICES, get_bazaar_prices, csv_data, DEFAULT_REQS
 
 app = FastAPI(title="Skyblock Mutations API")
+logger = logging.getLogger(__name__)
+
+
+def _env_int(name: str, default: int, *, minimum: int, maximum: int | None = None) -> int:
+    raw_value = os.getenv(name, "").strip()
+    if not raw_value:
+        return default
+
+    try:
+        parsed = int(raw_value)
+    except ValueError:
+        return default
+
+    if maximum is not None:
+        parsed = min(maximum, parsed)
+    return max(minimum, parsed)
+
+
+def _normalized_origin(value: str) -> str | None:
+    candidate = value.strip().rstrip("/")
+    if not candidate:
+        return None
+
+    parsed = urlparse(candidate)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return None
+
+    return f"{parsed.scheme}://{parsed.netloc}"
 
 
 def _allowed_origins_from_env() -> List[str]:
     raw_origins = os.getenv("ALLOWED_ORIGINS", "").strip()
     origins: List[str] = []
     if raw_origins:
-        origins.extend([o.strip() for o in raw_origins.split(",") if o.strip()])
+        for origin in raw_origins.split(","):
+            normalized = _normalized_origin(origin)
+            if normalized:
+                origins.append(normalized)
     else:
         origins.extend([
             "http://localhost:3000",
@@ -33,11 +66,15 @@ def _allowed_origins_from_env() -> List[str]:
 
     frontend_url = os.getenv("FRONTEND_URL", "").strip()
     if frontend_url:
-        origins.append(frontend_url)
+        normalized = _normalized_origin(frontend_url)
+        if normalized:
+            origins.append(normalized)
 
     vercel_url = os.getenv("VERCEL_URL", "").strip()
     if vercel_url:
-        origins.append(f"https://{vercel_url}")
+        normalized = _normalized_origin(f"https://{vercel_url}")
+        if normalized:
+            origins.append(normalized)
 
     # Preserve order while de-duplicating.
     deduped: List[str] = []
@@ -57,19 +94,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60"))
-RATE_LIMIT_MAX_REQUESTS = int(os.getenv("RATE_LIMIT_MAX_REQUESTS", "120"))
+RATE_LIMIT_WINDOW_SECONDS = _env_int("RATE_LIMIT_WINDOW_SECONDS", 60, minimum=1, maximum=3600)
+RATE_LIMIT_MAX_REQUESTS = _env_int("RATE_LIMIT_MAX_REQUESTS", 120, minimum=1, maximum=5000)
+BAZAAR_CACHE_TTL_SECONDS = _env_int("BAZAAR_CACHE_TTL_SECONDS", 30, minimum=5, maximum=300)
 _rate_limit_buckets: Dict[str, Deque[float]] = defaultdict(deque)
 _rate_limit_lock = Lock()
+_bazaar_cache_lock = Lock()
+_bazaar_cache_data: Dict[str, Dict[str, float]] = {}
+_bazaar_cache_expires_at = 0.0
 
 
 def _client_ip_from_request(request: Request) -> str:
     forwarded = request.headers.get("x-forwarded-for", "")
     if forwarded:
         # First IP in the chain is the original client.
-        return forwarded.split(",")[0].strip() or "unknown"
+        client_ip = forwarded.split(",", 1)[0].strip()
+        return client_ip[:64] or "unknown"
     if request.client and request.client.host:
-        return request.client.host
+        return request.client.host[:64]
     return "unknown"
 
 
@@ -126,14 +168,18 @@ async def _security_headers(request: Request, call_next):
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
 
-# Load manual data
-MANUAL_DATA = {}
-try:
+def _load_manual_data() -> Dict[str, Any]:
     json_path = os.path.join(os.path.dirname(__file__), "..", "mutation_ingredient_list.json")
-    with open(json_path, "r", encoding="utf-8") as f:
-        MANUAL_DATA = json.load(f)
-except Exception as e:
-    print(f"Error loading manual data json: {e}")
+    try:
+        with open(json_path, "r", encoding="utf-8") as file_handle:
+            loaded = json.load(file_handle)
+            return loaded if isinstance(loaded, dict) else {}
+    except (OSError, json.JSONDecodeError):
+        logger.warning("Mutation ingredient data could not be loaded.")
+        return {}
+
+
+MANUAL_DATA = _load_manual_data()
 
 DEFAULT_GROWTH_STAGE_BY_MUTATION = {
     "Magic Jellybean": 120,
@@ -168,6 +214,17 @@ OVERDRIVE_BONUS_PER_LEVEL: Dict[str, float] = {
     "epic": 6.0,
     "legendary": 7.0,
 }
+CSV_IGNORED_COLUMNS = {
+    "Mutation/Drops",
+    "Base_Limit",
+    "Crop Fortune type",
+    "If u figure it out...",
+}
+MUSHROOM_SOURCE_COLUMNS = {"Red Mushroom", "Brown Mushroom"}
+MUSHROOM_PRICE_OVERRIDE = 10.0
+VALID_LEADERBOARD_MODES = {"profit", "smart", "target", "hourly"}
+VALID_SETUP_MODES = {"insta_buy", "buy_order"}
+VALID_SELL_MODES = {"insta_sell", "sell_offer"}
 
 
 def normalized_chip_rarity(value: Any, default: str = "legendary") -> str:
@@ -186,6 +243,15 @@ def clamp_chip_level(value: Any, *, rarity: str, default: int) -> int:
     return max(0, min(max_level, value))
 
 
+def normalized_choice(value: Any, *, valid_values: set[str], default: str) -> str:
+    if not isinstance(value, str):
+        return default
+    cleaned = value.strip().lower()
+    if cleaned in valid_values:
+        return cleaned
+    return default
+
+
 def canonical_crop_name(name: str) -> str:
     cleaned = name.strip()
     if cleaned in {"Red Mushroom", "Brown Mushroom", "Mushroom"}:
@@ -199,6 +265,109 @@ def has_wide_spread(price_a: float, price_b: float) -> bool:
     hi = max(price_a, price_b)
     lo = min(price_a, price_b)
     return (hi / lo) >= SPREAD_WARNING_RATIO
+
+
+def get_cached_bazaar_prices() -> Dict[str, Dict[str, float]]:
+    global _bazaar_cache_data, _bazaar_cache_expires_at
+
+    now = time.monotonic()
+    with _bazaar_cache_lock:
+        if _bazaar_cache_data and now < _bazaar_cache_expires_at:
+            return _bazaar_cache_data
+        stale_data = _bazaar_cache_data
+
+    fresh_data = get_bazaar_prices()
+    if isinstance(fresh_data, dict) and fresh_data:
+        with _bazaar_cache_lock:
+            _bazaar_cache_data = fresh_data
+            _bazaar_cache_expires_at = now + BAZAAR_CACHE_TTL_SECONDS
+        return fresh_data
+
+    if stale_data:
+        return stale_data
+
+    with _bazaar_cache_lock:
+        _bazaar_cache_expires_at = now + 5.0
+    return {}
+
+
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return default
+    return parsed if math.isfinite(parsed) else default
+
+
+def _safe_non_negative_int(value: Any, default: int) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(0, parsed)
+
+
+def _build_mutation_catalog() -> tuple[tuple[Dict[str, Any], ...], frozenset[str]]:
+    reader = csv.DictReader(io.StringIO(csv_data))
+    fieldnames = [column.strip() for column in (reader.fieldnames or [])]
+    raw_crop_columns = [column for column in fieldnames if column and column not in CSV_IGNORED_COLUMNS]
+    catalog: List[Dict[str, Any]] = []
+    target_crops: set[str] = set()
+
+    for row in reader:
+        cleaned_row = {
+            key.strip(): (value.strip() if isinstance(value, str) else value)
+            for key, value in row.items()
+            if key
+        }
+        mutation_name = cleaned_row.get("Mutation/Drops", "")
+        if not mutation_name or mutation_name not in MANUAL_DATA:
+            continue
+
+        mutation_data = MANUAL_DATA[mutation_name]
+        crop_drops: List[Dict[str, Any]] = []
+        for crop_name in raw_crop_columns:
+            base_drop = _safe_float(cleaned_row.get(crop_name, "0.0"))
+            if base_drop <= 0:
+                continue
+
+            display_name = "Mushroom" if crop_name in MUSHROOM_SOURCE_COLUMNS else crop_name
+            crop_drops.append({
+                "source_name": crop_name,
+                "display_name": display_name,
+                "canonical_name": canonical_crop_name(crop_name),
+                "base_drop": base_drop,
+                "price_override": MUSHROOM_PRICE_OVERRIDE if crop_name in MUSHROOM_SOURCE_COLUMNS else None,
+            })
+            target_crops.add(display_name)
+
+        special_multiplier = _safe_float(
+            mutation_data.get("special_multiplier", DEFAULT_SPECIAL_MULTIPLIER_BY_MUTATION.get(mutation_name, 1.0)),
+            1.0,
+        )
+        effective_special_multiplier = _safe_float(
+            mutation_data.get("effective_special_multiplier", special_multiplier),
+            special_multiplier,
+        )
+        mutation_chance_override = mutation_data.get("mutation_chance_override")
+
+        catalog.append({
+            "name": mutation_name,
+            "base_limit": _safe_non_negative_int(mutation_data.get("count", 1), 1),
+            "ingredients": tuple(mutation_data.get("ingredients", {}).items()),
+            "growth_stages": _safe_non_negative_int(
+                mutation_data.get("growth_stages", DEFAULT_GROWTH_STAGE_BY_MUTATION.get(mutation_name, 30)),
+                30,
+            ),
+            "effective_special_multiplier": effective_special_multiplier,
+            "mutation_chance_override": _safe_float(mutation_chance_override) if mutation_chance_override is not None else None,
+            "crop_drops": tuple(crop_drops),
+        })
+
+    return tuple(catalog), frozenset(target_crops)
+
+
+MUTATION_CATALOG, VALID_TARGET_CROPS = _build_mutation_catalog()
 
 
 def metric_spawn_chance_for_mutation(mutation_name: str) -> float:
@@ -279,7 +448,7 @@ def build_warning_messages(mutation_name: str, market_warning: bool) -> List[str
     if mutation_name == "Devourer":
         messages.append("Devourer can spread into nearby crops and destroy them if you do not isolate it.")
     if mutation_name == "Magic Jellybean":
-        messages.append("Magic Jellybean has 120 growth stages and is best harvested fully grown so spawn wait is not wasted.")
+        messages.append("Magic Jellybean has 120 growth stages. It is best to harvest when its fully grown so you waste less time waiting for spawns.")
     if mutation_name == "All-in Aloe":
         messages.append("All-in Aloe is evaluated at Stage 14. Its raw multiplier there is 60x, but the calculator uses the reset-adjusted expected multiplier of 9.37x.")
     return messages
@@ -297,7 +466,7 @@ def get_leaderboard(
     gh_yield_upgrade: int | None = Query(None, ge=0, le=9),
     gh_speed_upgrade: int | None = Query(None, ge=0, le=9),
     unique_crops: int = Query(12, ge=0, le=12),
-    mode: str = Query("profit"),  # "profit", "smart", "target"
+    mode: str = Query("profit"),  # "profit", "smart", "target", "hourly"
     setup_mode: str = Query("insta_buy"), # "insta_buy" or "buy_order"
     sell_mode: str = Query("sell_offer"), # "insta_sell" or "sell_offer"
     target_crop: str = Query(None),
@@ -324,14 +493,19 @@ def get_leaderboard(
             return default
         return max(minimum, min(maximum, value))
 
+    plots = normalized_int(plots, default=1, minimum=1, maximum=3)
+    fortune = normalized_int(fortune, default=2500, minimum=0, maximum=10000)
     if not isinstance(maxed_crops, str):
         maxed_crops = ""
-    if not isinstance(mutation_chance, (int, float)):
+    if not isinstance(mutation_chance, (int, float)) or not math.isfinite(float(mutation_chance)) or not (0.0 < float(mutation_chance) < 1.0):
         mutation_chance = 0.25
     if not isinstance(harvest_mode, str):
         harvest_mode = "full"
-    if not isinstance(custom_time_hours, (int, float)):
+    if not isinstance(custom_time_hours, (int, float)) or not math.isfinite(float(custom_time_hours)) or float(custom_time_hours) <= 0.0:
         custom_time_hours = 24.0
+    mode = normalized_choice(mode, valid_values=VALID_LEADERBOARD_MODES, default="profit")
+    setup_mode = normalized_choice(setup_mode, valid_values=VALID_SETUP_MODES, default="insta_buy")
+    sell_mode = normalized_choice(sell_mode, valid_values=VALID_SELL_MODES, default="sell_offer")
     hypercharge_rarity = normalized_chip_rarity(hypercharge_rarity)
     evergreen_chip_rarity = normalized_chip_rarity(evergreen_chip_rarity)
     overdrive_chip_rarity = normalized_chip_rarity(overdrive_chip_rarity)
@@ -342,18 +516,26 @@ def get_leaderboard(
     gh_yield_upgrade = normalized_int(gh_yield_upgrade, default=legacy_gh_upgrade, minimum=0, maximum=9)
     gh_speed_upgrade = normalized_int(gh_speed_upgrade, default=legacy_gh_upgrade, minimum=0, maximum=9)
     unique_crops = normalized_int(unique_crops, default=12, minimum=0, maximum=12)
-    if not isinstance(per_harvest_cost, (int, float)):
+    if not isinstance(per_harvest_cost, (int, float)) or not math.isfinite(float(per_harvest_cost)):
         per_harvest_cost = 0.0
+    normalized_target_crop = canonical_crop_name(target_crop) if isinstance(target_crop, str) and target_crop.strip() else None
+    if normalized_target_crop not in VALID_TARGET_CROPS:
+        normalized_target_crop = None
     normalized_overdrive_crop = canonical_crop_name(overdrive_crop) if isinstance(overdrive_crop, str) and overdrive_crop.strip() else None
+    if normalized_overdrive_crop not in VALID_TARGET_CROPS:
+        normalized_overdrive_crop = None
     
     # Load Data
-    bazaar_data = get_bazaar_prices()
-    
-    reader = csv.DictReader(io.StringIO(csv_data))
-    raw_crop_cols = [c.strip() for c in reader.fieldnames if c.strip() not in ['Mutation/Drops', 'Base_Limit', 'Crop Fortune type', 'If u figure it out...']]
+    bazaar_data = get_cached_bazaar_prices()
     
     # Parse maxed crops
-    maxed_list = [c.strip() for c in maxed_crops.split(",") if c.strip()]
+    maxed_list = []
+    seen_maxed = set()
+    for crop_name in maxed_crops.split(","):
+        cleaned_name = canonical_crop_name(crop_name)
+        if cleaned_name in DEFAULT_REQS and cleaned_name not in seen_maxed:
+            seen_maxed.add(cleaned_name)
+            maxed_list.append(cleaned_name)
     missing_crops = [crop for crop in DEFAULT_REQS.keys() if crop not in maxed_list]
     
     # Cycle Time Math
@@ -409,25 +591,19 @@ def get_leaderboard(
         finite = finite_or_none(value)
         return finite if finite is not None else 0.0
                 
-    for row in reader:
-        cleaned_row = {k.strip(): v for k, v in row.items()}
-        mut_name = cleaned_row.get('Mutation/Drops', '')
-        
-        if mut_name not in MANUAL_DATA: 
-            continue
-            
-        m_data = MANUAL_DATA[mut_name]
-        base_limit = m_data.get("count", 1)
+    for mutation in MUTATION_CATALOG:
+        mut_name = mutation["name"]
+        base_limit = mutation["base_limit"]
         limit = base_limit * plots
-        ingredients = m_data.get("ingredients", {})
-        mutation_chance_effective = float(m_data.get("mutation_chance_override", mutation_chance))
-        
+        mutation_chance_override = mutation["mutation_chance_override"]
+        mutation_chance_effective = mutation_chance_override if mutation_chance_override is not None else float(mutation_chance)
+
         # 1. Setup Cost
-        opt_cost = 0
+        opt_cost = 0.0
         ing_warning = False
         ingredient_costs = []
-        
-        for ing, qty_per_plot in ingredients.items():
+
+        for ing, qty_per_plot in mutation["ingredients"]:
             total_qty = qty_per_plot * plots
             cost_per_ing = get_item_price(ing, True, setup_mode)
             total_cost = total_qty * cost_per_ing
@@ -436,89 +612,72 @@ def get_leaderboard(
                 "name": ing,
                 "amount": total_qty,
                 "unit_price": cost_per_ing,
-                "total_cost": total_cost
+                "total_cost": total_cost,
             })
-            
-            # Warning logic if spread is bad
+
             ing_market = bazaar_data.get(ing, {"buyPrice": 0, "sellPrice": 0})
-            if has_wide_spread(ing_market.get('buyPrice', 0), ing_market.get('sellPrice', 0)):
+            if has_wide_spread(ing_market.get("buyPrice", 0), ing_market.get("sellPrice", 0)):
                 ing_warning = True
 
-        # Fetch Prices for Mutation itself
         mut_sell_price_value = get_item_price(mut_name, False, sell_mode)
         market_data = bazaar_data.get(mut_name, {"buyPrice": 0, "sellPrice": 0})
-        mut_warning = False
-        if has_wide_spread(market_data.get('buyPrice', 0), market_data.get('sellPrice', 0)):
-            mut_warning = True
-            
+        mut_warning = has_wide_spread(market_data.get("buyPrice", 0), market_data.get("sellPrice", 0))
+
         # 2. Return per Batch (One Harvest)
-        expected_drops_value = 0
-        
-        # Growth stage and special multiplier can be overridden per mutation in mutation_ingredient_list.json
-        growth_stages = max(0, int(m_data.get("growth_stages", DEFAULT_GROWTH_STAGE_BY_MUTATION.get(mut_name, 30))))
-        special_mult = float(m_data.get("special_multiplier", DEFAULT_SPECIAL_MULTIPLIER_BY_MUTATION.get(mut_name, 1.0)))
-        effective_special_mult = float(m_data.get("effective_special_multiplier", special_mult))
+        growth_stages = mutation["growth_stages"]
+        effective_special_mult = mutation["effective_special_multiplier"]
         spawn_fill_fraction = 1.0
-        if "mutation_chance_override" in m_data:
+        if mutation_chance_override is not None:
             spawn_fill_fraction = 1.0 - ((1.0 - mutation_chance_effective) ** growth_stages)
         effective_limit = limit * spawn_fill_fraction
-            
-        # Even instant-after-spawn mutations still need one garden cycle to realize value in practice.
-        estimated_time = max(1, growth_stages) * cycle_time_hours
-        
-        yields = []
-        
-        for crop_col in raw_crop_cols:
-            raw_val = cleaned_row.get(crop_col, "0.0")
-            base_drop = float(raw_val) if raw_val and raw_val.strip() else 0.0
-            
-            if base_drop > 0:
-                canonical_crop = canonical_crop_name(crop_col)
-                crop_overdrive_bonus = overdrive_bonus if normalized_overdrive_crop and canonical_crop == normalized_overdrive_crop else 0.0
-                crop_fortune_mult = (((effective_fortune + crop_overdrive_bonus) / 100) + 1)
-                full_drops = base_drop * effective_limit * base_yield_mult * crop_fortune_mult
-                
-                expected_drops = (full_drops * effective_special_mult)
-                bd_display = base_drop
-                sm_display = effective_special_mult
-                    
-                crop_price = get_item_price(crop_col, False, sell_mode)
-                if crop_col in {"Red Mushroom", "Red Mushroom ", "Brown Mushroom"}:
-                    crop_price = 10
-                expected_drops_value += expected_drops * crop_price
-                
-                display_name = "Mushroom" if crop_col in {"Red Mushroom", "Red Mushroom ", "Brown Mushroom"} else crop_col
-                
-                # Merge mushroom drops visually if multiple
-                existing = next((item for item in yields if item["name"] == display_name), None)
-                if existing:
-                    existing["amount"] += expected_drops
-                    existing["total_value"] += expected_drops * crop_price
-                    if existing.get("math"):
-                        existing["math"]["base"] += bd_display
-                else:
-                    yields.append({
-                        "name": display_name,
-                        "amount": expected_drops,
-                        "unit_price": crop_price,
-                        "total_value": expected_drops * crop_price,
-                        "math": {
-                            "base": bd_display,
-                            "limit": effective_limit,
-                            "evergreen_buff": evergreen_buff,
-                            "gh_buff": gh_buff,
-                            "unique_buff": unique_buff,
-                            "wart_buff": wart_buff,
-                            "fortune": crop_fortune_mult,
-                            "overdrive_bonus": crop_overdrive_bonus,
-                            "special": sm_display
-                        }
-                    })
-                
+
+        # Lifecycle display is post-spawn only. Expected spawn wait is handled in expected-cycle metrics.
+        estimated_time = growth_stages * cycle_time_hours
+
+        expected_drops_value = 0.0
+        yields: List[Dict[str, Any]] = []
+        yield_by_name: Dict[str, Dict[str, Any]] = {}
+
+        for crop_drop in mutation["crop_drops"]:
+            crop_overdrive_bonus = overdrive_bonus if normalized_overdrive_crop and crop_drop["canonical_name"] == normalized_overdrive_crop else 0.0
+            crop_fortune_mult = (((effective_fortune + crop_overdrive_bonus) / 100) + 1)
+            full_drops = crop_drop["base_drop"] * effective_limit * base_yield_mult * crop_fortune_mult
+            expected_drops = full_drops * effective_special_mult
+            crop_price = crop_drop["price_override"] or get_item_price(crop_drop["source_name"], False, sell_mode)
+            total_value = expected_drops * crop_price
+            expected_drops_value += total_value
+
+            existing = yield_by_name.get(crop_drop["display_name"])
+            if existing:
+                existing["amount"] += expected_drops
+                existing["total_value"] += total_value
+                if existing.get("math"):
+                    existing["math"]["base"] += crop_drop["base_drop"]
+            else:
+                yield_item = {
+                    "name": crop_drop["display_name"],
+                    "amount": expected_drops,
+                    "unit_price": crop_price,
+                    "total_value": total_value,
+                    "math": {
+                        "base": crop_drop["base_drop"],
+                        "limit": effective_limit,
+                        "evergreen_buff": evergreen_buff,
+                        "gh_buff": gh_buff,
+                        "unique_buff": unique_buff,
+                        "wart_buff": wart_buff,
+                        "fortune": crop_fortune_mult,
+                        "overdrive_bonus": crop_overdrive_bonus,
+                        "special": effective_special_mult,
+                    },
+                }
+                yields.append(yield_item)
+                yield_by_name[crop_drop["display_name"]] = yield_item
+
         expected_mut_drops = effective_limit
         expected_mut_val = expected_mut_drops * mut_sell_price_value
         total_cycle_revenue = expected_drops_value + expected_mut_val
-        
+
         if expected_mut_drops > 0:
             yields.append({
                 "name": mut_name,
@@ -533,11 +692,11 @@ def get_leaderboard(
                     "unique_buff": 0.0,
                     "wart_buff": 1.0,
                     "fortune": 1.0,
-                    "special": 1.0
-                }
+                    "special": 1.0,
+                },
             })
-        
-        crop_yields_by_name = {y["name"]: y["amount"] for y in yields if y["name"] in DEFAULT_REQS}
+
+        crop_yields_by_name = {yld["name"]: yld["amount"] for yld in yields if yld["name"] in DEFAULT_REQS}
         smart_progress = {}
         for req_crop in missing_crops:
             req_amt = DEFAULT_REQS.get(req_crop, 0)
@@ -564,21 +723,20 @@ def get_leaderboard(
         warning_messages = build_warning_messages(mut_name, mut_warning or ing_warning)
 
         payback_hours_ready = (opt_cost / hourly_profit_selected) if (hourly_profit_selected is not None and hourly_profit_selected > 0) else None
-        
+
         # 4. Scoring Logic
         score = 0
         if mode == "profit":
             score = profit_batch
-        elif mode == "target" and target_crop:
-            score = next((item["amount"] for item in yields if item["name"] == target_crop), 0.0)
-            
+        elif mode == "target" and normalized_target_crop:
+            score = next((item["amount"] for item in yields if item["name"] == normalized_target_crop), 0.0)
         elif mode == "smart":
             score = sum(smart_progress.values())
             if score <= 0:
                 continue
         elif mode == "hourly":
             score = hourly_profit_selected if hourly_profit_selected is not None else float("-inf")
-            
+
         breakdown = {
             "base_limit": base_limit,
             "ingredients": ingredient_costs,
@@ -586,9 +744,9 @@ def get_leaderboard(
             "total_setup_cost": opt_cost,
             "total_revenue": total_cycle_revenue,
             "growth_stages": growth_stages,
-            "estimated_time_hours": estimated_time
+            "estimated_time_hours": estimated_time,
         }
-            
+
         leaderboard_data.append({
             "mutationName": mut_name,
             "score": score,
@@ -630,7 +788,7 @@ def get_leaderboard(
                 "expected_profit_per_hour": hourly_profit_selected,
             },
             "profit_models": profit_models,
-            "breakdown": breakdown
+            "breakdown": breakdown,
         })
 
     leaderboard_data.sort(key=lambda x: x["score"], reverse=True)
