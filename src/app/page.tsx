@@ -8,7 +8,7 @@ import Image from "next/image";
 type OptimizationMode = "profit" | "smart" | "target";
 type SetupMode = "buy_order" | "insta_buy";
 type SellMode = "sell_offer" | "insta_sell";
-type SortKey = "rank" | "mutation" | "value" | "cycles" | "setup";
+type SortKey = "rank" | "mutation" | "value" | "growth_cycle_profit" | "cycles" | "setup";
 type SortDirection = "asc" | "desc";
 
 type YieldMath = {
@@ -50,10 +50,12 @@ type LeaderboardItem = {
   mutationName: string;
   score: number;
   profit: number;
+  profit_per_growth_cycle?: number | null;
   profit_per_hour: number;
   opt_cost: number;
   revenue: number;
   warning: boolean;
+  warning_messages?: string[];
   mut_price: number;
   limit: number;
   smart_progress?: Record<string, number>;
@@ -103,6 +105,32 @@ const toMutationLabel = (mutation: string) => {
 const toMutationIconPath = (mutationName: string) =>
   `/icons/mutations/${mutationName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}.png`;
 const setupCostNote = "Some mutations decay after a few days, so setup cost may recur.";
+const faqItems = [
+  {
+    question: "What is Profit per Harvest?",
+    answer: "Profit per Harvest is the estimated value of crop drops plus the mutation itself, minus setup cost for the placement plan.",
+  },
+  {
+    question: "What is Profit per Growth Cycle?",
+    answer: "Profit per Growth Cycle divides Profit per Harvest by the mutation's growth stages so slower mutations can be compared more fairly. Mutations with 0 growth stages show N/A.",
+  },
+  {
+    question: "Where do prices come from?",
+    answer: "The tool uses live Bazaar prices for market items and falls back to fixed NPC prices when an item is sold at a static value.",
+  },
+  {
+    question: "Do all mutations use the same spawn assumption?",
+    answer: "Most mutations use the standard full-growth assumption across the planted spots. Lonelily is handled separately with its own backend spawn override, so it is not treated like a normal full-coverage mutation.",
+  },
+  {
+    question: "Why do some rows show warning icons?",
+    answer: "Warnings call out cases where the estimate is less reliable in practice, such as wide market spreads, Devourer spread risk, Magic Jellybean's long maturity, or All-in Aloe's reset behavior.",
+  },
+  {
+    question: "Which settings change the estimates?",
+    answer: "Plots, Greenhouse upgrades, Unique Crops, Farming Fortune, harvest-related buffs, and your chosen buy or sell strategy all feed into the final result.",
+  },
+] as const;
 
 export default function Home() {
   const [plots, setPlots] = useState(3);

@@ -158,6 +158,30 @@ def has_wide_spread(price_a: float, price_b: float) -> bool:
     return (hi / lo) >= SPREAD_WARNING_RATIO
 
 
+def compute_profit_per_growth_cycle(profit_per_harvest: float, growth_stages: int) -> float | None:
+    if growth_stages <= 0:
+        return None
+    if not math.isfinite(profit_per_harvest):
+        return None
+    result = profit_per_harvest / float(growth_stages)
+    if not math.isfinite(result):
+        return None
+    return float(result)
+
+
+def build_warning_messages(mutation_name: str, market_warning: bool) -> List[str]:
+    messages: List[str] = []
+    if market_warning:
+        messages.append("Market spreads are wide right now. Double check your buy and sell strategy before placing large orders.")
+    if mutation_name == "Devourer":
+        messages.append("Devourer can spread into nearby crops and destroy them if you do not isolate it.")
+    if mutation_name == "Magic Jellybean":
+        messages.append("Magic Jellybean takes much longer to mature than most mutations, so real runs can vary more over time.")
+    if mutation_name == "All-in Aloe":
+        messages.append("All-in Aloe can reset its multiplier, so the displayed result is only an estimate of the best harvest window.")
+    return messages
+
+
 @app.get("/api/ping")
 def ping():
     return {"status": "ok"}
@@ -420,8 +444,10 @@ def get_leaderboard(
                 "v_net": None,
                 "warnings": [f"profit model error: {exc}"],
             }
+        profit_per_growth_cycle = compute_profit_per_growth_cycle(profit_batch, growth_stages)
         profit_per_hour = finite_or_zero(profit_models.get("profit_per_hour"))
         hourly_profit_selected = finite_or_none(profit_models.get("profit_per_hour"))
+        warning_messages = build_warning_messages(mut_name, mut_warning or ing_warning)
 
         payback_hours_ready = (opt_cost / hourly_profit_selected) if (hourly_profit_selected is not None and hourly_profit_selected > 0) else None
         
@@ -456,10 +482,12 @@ def get_leaderboard(
             "mutationName": mut_name,
             "score": score,
             "profit": profit_batch,
+            "profit_per_growth_cycle": profit_per_growth_cycle,
             "profit_per_hour": profit_per_hour,
             "opt_cost": opt_cost,
             "revenue": total_cycle_revenue,
-            "warning": mut_warning or ing_warning,
+            "warning": len(warning_messages) > 0,
+            "warning_messages": warning_messages,
             "mut_price": mut_sell_price_value,
             "limit": limit,
             "smart_progress": smart_progress,
