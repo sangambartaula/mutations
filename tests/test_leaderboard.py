@@ -41,6 +41,7 @@ class LeaderboardTests(unittest.TestCase):
             gh_yield_upgrade=9,
             gh_speed_upgrade=9,
             evergreen_chip_level=20,
+            evergreen_chip_rarity="legendary",
             unique_crops=12,
             mode="profit",
             setup_mode="buy_order",
@@ -54,6 +55,7 @@ class LeaderboardTests(unittest.TestCase):
             gh_yield_upgrade=0,
             gh_speed_upgrade=0,
             evergreen_chip_level=0,
+            evergreen_chip_rarity="legendary",
             unique_crops=12,
             mode="profit",
             setup_mode="buy_order",
@@ -80,6 +82,131 @@ class LeaderboardTests(unittest.TestCase):
         self.assertEqual(pumpkin_maxed["math"]["evergreen_buff"], 0.6)
         self.assertEqual(pumpkin_reduced["math"]["evergreen_buff"], 0.0)
         self.assertGreater(pumpkin_maxed["amount"], pumpkin_reduced["amount"])
+
+    @patch("api.index.get_bazaar_prices", return_value={})
+    def test_chip_rarity_changes_hypercharge_and_evergreen_scaling(self, _mock_prices):
+        rare = get_leaderboard(
+            plots=3,
+            fortune=100,
+            gh_yield_upgrade=9,
+            gh_speed_upgrade=9,
+            unique_crops=12,
+            harvest_harbinger=False,
+            infini_vacuum=True,
+            dark_cacao=False,
+            hypercharge_level=10,
+            hypercharge_rarity="rare",
+            evergreen_chip_level=10,
+            evergreen_chip_rarity="rare",
+            mode="profit",
+            setup_mode="buy_order",
+            sell_mode="sell_offer",
+            target_crop=None,
+            maxed_crops="",
+        )
+        legendary = get_leaderboard(
+            plots=3,
+            fortune=100,
+            gh_yield_upgrade=9,
+            gh_speed_upgrade=9,
+            unique_crops=12,
+            harvest_harbinger=False,
+            infini_vacuum=True,
+            dark_cacao=False,
+            hypercharge_level=10,
+            hypercharge_rarity="legendary",
+            evergreen_chip_level=10,
+            evergreen_chip_rarity="legendary",
+            mode="profit",
+            setup_mode="buy_order",
+            sell_mode="sell_offer",
+            target_crop=None,
+            maxed_crops="",
+        )
+
+        self.assertAlmostEqual(rare["metadata"]["fortune_breakdown"]["affected_multiplier"], 1.3, places=6)
+        self.assertAlmostEqual(legendary["metadata"]["fortune_breakdown"]["affected_multiplier"], 1.5, places=6)
+        self.assertAlmostEqual(rare["metadata"]["yield_breakdown"]["evergreen_bonus"], 0.2, places=6)
+        self.assertAlmostEqual(legendary["metadata"]["yield_breakdown"]["evergreen_bonus"], 0.3, places=6)
+
+    @patch("api.index.get_bazaar_prices", return_value={})
+    def test_chip_levels_are_clamped_by_rarity(self, _mock_prices):
+        result = get_leaderboard(
+            plots=3,
+            fortune=2500,
+            gh_yield_upgrade=9,
+            gh_speed_upgrade=9,
+            unique_crops=12,
+            hypercharge_level=20,
+            hypercharge_rarity="rare",
+            evergreen_chip_level=20,
+            evergreen_chip_rarity="rare",
+            overdrive_chip_level=20,
+            overdrive_chip_rarity="rare",
+            overdrive_crop="Pumpkin",
+            mode="profit",
+            setup_mode="buy_order",
+            sell_mode="sell_offer",
+            target_crop=None,
+            maxed_crops="",
+        )
+
+        self.assertAlmostEqual(result["metadata"]["fortune_breakdown"]["affected_multiplier"], 1.3, places=6)
+        self.assertAlmostEqual(result["metadata"]["yield_breakdown"]["evergreen_bonus"], 0.2, places=6)
+        self.assertEqual(result["metadata"]["yield_breakdown"]["overdrive_bonus"], 50.0)
+
+    @patch("api.index.get_bazaar_prices", return_value={})
+    def test_overdrive_bonus_only_applies_to_matching_crop(self, _mock_prices):
+        baseline = get_leaderboard(
+            plots=3,
+            fortune=0,
+            gh_yield_upgrade=0,
+            gh_speed_upgrade=0,
+            unique_crops=0,
+            evergreen_chip_level=0,
+            improved_harvest_boost=False,
+            mode="profit",
+            setup_mode="buy_order",
+            sell_mode="sell_offer",
+            target_crop=None,
+            maxed_crops="",
+        )
+        with_overdrive = get_leaderboard(
+            plots=3,
+            fortune=0,
+            gh_yield_upgrade=0,
+            gh_speed_upgrade=0,
+            unique_crops=0,
+            evergreen_chip_level=0,
+            improved_harvest_boost=False,
+            overdrive_chip_level=20,
+            overdrive_chip_rarity="legendary",
+            overdrive_crop="Pumpkin",
+            mode="profit",
+            setup_mode="buy_order",
+            sell_mode="sell_offer",
+            target_crop=None,
+            maxed_crops="",
+        )
+
+        devourer_baseline = next((m for m in baseline["leaderboard"] if m["mutationName"] == "Devourer"), None)
+        devourer_overdrive = next((m for m in with_overdrive["leaderboard"] if m["mutationName"] == "Devourer"), None)
+        self.assertIsNotNone(devourer_baseline)
+        self.assertIsNotNone(devourer_overdrive)
+
+        pumpkin_baseline = next((y for y in devourer_baseline["breakdown"]["yields"] if y["name"] == "Pumpkin"), None)
+        pumpkin_overdrive = next((y for y in devourer_overdrive["breakdown"]["yields"] if y["name"] == "Pumpkin"), None)
+        mushroom_baseline = next((y for y in devourer_baseline["breakdown"]["yields"] if y["name"] == "Mushroom"), None)
+        mushroom_overdrive = next((y for y in devourer_overdrive["breakdown"]["yields"] if y["name"] == "Mushroom"), None)
+
+        self.assertIsNotNone(pumpkin_baseline)
+        self.assertIsNotNone(pumpkin_overdrive)
+        self.assertIsNotNone(mushroom_baseline)
+        self.assertIsNotNone(mushroom_overdrive)
+        self.assertGreater(pumpkin_overdrive["amount"], pumpkin_baseline["amount"])
+        self.assertAlmostEqual(mushroom_overdrive["amount"], mushroom_baseline["amount"], places=6)
+        self.assertEqual(pumpkin_overdrive["math"]["overdrive_bonus"], 140.0)
+        self.assertEqual(mushroom_overdrive["math"]["overdrive_bonus"], 0.0)
 
     @patch("api.index.get_bazaar_prices", return_value={})
     def test_legacy_greenhouse_upgrade_still_feeds_split_defaults(self, _mock_prices):

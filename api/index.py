@@ -148,6 +148,49 @@ DEFAULT_SPECIAL_MULTIPLIER_BY_MUTATION = {
 }
 
 SPREAD_WARNING_RATIO = 2.0  # 100% difference => 2x between two prices.
+CHIP_LEVEL_CAP_BY_RARITY: Dict[str, int] = {
+    "rare": 10,
+    "epic": 15,
+    "legendary": 20,
+}
+HYPERCHARGE_BONUS_PER_LEVEL: Dict[str, float] = {
+    "rare": 0.03,
+    "epic": 0.04,
+    "legendary": 0.05,
+}
+EVERGREEN_BONUS_PER_LEVEL: Dict[str, float] = {
+    "rare": 0.02,
+    "epic": 0.025,
+    "legendary": 0.03,
+}
+OVERDRIVE_BONUS_PER_LEVEL: Dict[str, float] = {
+    "rare": 5.0,
+    "epic": 6.0,
+    "legendary": 7.0,
+}
+
+
+def normalized_chip_rarity(value: Any, default: str = "legendary") -> str:
+    if not isinstance(value, str):
+        return default
+    rarity = value.strip().lower()
+    if rarity in CHIP_LEVEL_CAP_BY_RARITY:
+        return rarity
+    return default
+
+
+def clamp_chip_level(value: Any, *, rarity: str, default: int) -> int:
+    max_level = CHIP_LEVEL_CAP_BY_RARITY[rarity]
+    if isinstance(value, bool) or not isinstance(value, int):
+        return max(0, min(max_level, default))
+    return max(0, min(max_level, value))
+
+
+def canonical_crop_name(name: str) -> str:
+    cleaned = name.strip()
+    if cleaned in {"Red Mushroom", "Brown Mushroom", "Mushroom"}:
+        return "Mushroom"
+    return cleaned
 
 
 def has_wide_spread(price_a: float, price_b: float) -> bool:
@@ -206,8 +249,13 @@ def get_leaderboard(
     infini_vacuum: bool = Query(False),
     dark_cacao: bool = Query(False),
     improved_harvest_boost: bool = Query(True),
-    hypercharge_level: int = Query(0, ge=0, le=20),
-    evergreen_chip_level: int = Query(20, ge=0, le=20),
+    hypercharge_level: int | None = Query(None, ge=0, le=20),
+    hypercharge_rarity: str = Query("legendary"),
+    evergreen_chip_level: int | None = Query(None, ge=0, le=20),
+    evergreen_chip_rarity: str = Query("legendary"),
+    overdrive_chip_level: int | None = Query(None, ge=0, le=20),
+    overdrive_chip_rarity: str = Query("legendary"),
+    overdrive_crop: str | None = Query(None),
     per_harvest_cost: float = Query(0.0, ge=0.0),
 ) -> Dict[str, Any]:
     # Normalize FastAPI Query defaults when function is called directly in tests/scripts.
@@ -224,14 +272,19 @@ def get_leaderboard(
         harvest_mode = "full"
     if not isinstance(custom_time_hours, (int, float)):
         custom_time_hours = 24.0
-    hypercharge_level = normalized_int(hypercharge_level, default=0, minimum=0, maximum=20)
-    evergreen_chip_level = normalized_int(evergreen_chip_level, default=20, minimum=0, maximum=20)
+    hypercharge_rarity = normalized_chip_rarity(hypercharge_rarity)
+    evergreen_chip_rarity = normalized_chip_rarity(evergreen_chip_rarity)
+    overdrive_chip_rarity = normalized_chip_rarity(overdrive_chip_rarity)
+    hypercharge_level = clamp_chip_level(hypercharge_level, rarity=hypercharge_rarity, default=0)
+    evergreen_chip_level = clamp_chip_level(evergreen_chip_level, rarity=evergreen_chip_rarity, default=20)
+    overdrive_chip_level = clamp_chip_level(overdrive_chip_level, rarity=overdrive_chip_rarity, default=0)
     legacy_gh_upgrade = normalized_int(gh_upgrade, default=9, minimum=0, maximum=9)
     gh_yield_upgrade = normalized_int(gh_yield_upgrade, default=legacy_gh_upgrade, minimum=0, maximum=9)
     gh_speed_upgrade = normalized_int(gh_speed_upgrade, default=legacy_gh_upgrade, minimum=0, maximum=9)
     unique_crops = normalized_int(unique_crops, default=12, minimum=0, maximum=12)
     if not isinstance(per_harvest_cost, (int, float)):
         per_harvest_cost = 0.0
+    normalized_overdrive_crop = canonical_crop_name(overdrive_crop) if isinstance(overdrive_crop, str) and overdrive_crop.strip() else None
     
     # Load Data
     bazaar_data = get_bazaar_prices()
@@ -252,7 +305,7 @@ def get_leaderboard(
     # Additive base yield is modeled as:
     # Base (1.0) + Evergreen Chip (up to +0.60) + Greenhouse Yield (up to +0.20)
     # + Unique Crops (up to +0.36).
-    evergreen_buff = (evergreen_chip_level / 20.0) * 0.60
+    evergreen_buff = evergreen_chip_level * EVERGREEN_BONUS_PER_LEVEL[evergreen_chip_rarity]
     gh_buff = (gh_yield_upgrade / 9.0) * 0.20
     unique_buff = (unique_crops / 12.0) * 0.36
     additive_base = 1.0 + evergreen_buff + gh_buff + unique_buff
@@ -260,16 +313,15 @@ def get_leaderboard(
     # Buff fortune model:
     # Harvest Harbinger (+50) is unaffected by Hypercharge.
     # InfiniVacuum (+200) and Dark Cacao (+30) are affected by Hypercharge.
-    affected_multiplier = 1.0 + (max(0, min(20, hypercharge_level)) / 20.0)
+    affected_multiplier = 1.0 + (hypercharge_level * HYPERCHARGE_BONUS_PER_LEVEL[hypercharge_rarity])
     unaffected_bonus = 50.0 if harvest_harbinger else 0.0
     affected_bonus_base = (200.0 if infini_vacuum else 0.0) + (30.0 if dark_cacao else 0.0)
     total_bonus = unaffected_bonus + (affected_bonus_base * affected_multiplier)
     effective_fortune = fortune + total_bonus
+    overdrive_bonus = overdrive_chip_level * OVERDRIVE_BONUS_PER_LEVEL[overdrive_chip_rarity]
 
     wart_buff = 1.3 if improved_harvest_boost else 1.0
-    fortune_mult = ((effective_fortune / 100) + 1)
-    
-    calc_mult = additive_base * wart_buff * fortune_mult
+    base_yield_mult = additive_base * wart_buff
     
     leaderboard_data = []
     
@@ -361,7 +413,10 @@ def get_leaderboard(
             base_drop = float(raw_val) if raw_val and raw_val.strip() else 0.0
             
             if base_drop > 0:
-                full_drops = base_drop * effective_limit * calc_mult
+                canonical_crop = canonical_crop_name(crop_col)
+                crop_overdrive_bonus = overdrive_bonus if normalized_overdrive_crop and canonical_crop == normalized_overdrive_crop else 0.0
+                crop_fortune_mult = (((effective_fortune + crop_overdrive_bonus) / 100) + 1)
+                full_drops = base_drop * effective_limit * base_yield_mult * crop_fortune_mult
                 
                 expected_drops = (full_drops * effective_special_mult)
                 bd_display = base_drop
@@ -394,7 +449,8 @@ def get_leaderboard(
                             "gh_buff": gh_buff,
                             "unique_buff": unique_buff,
                             "wart_buff": wart_buff,
-                            "fortune": fortune_mult,
+                            "fortune": crop_fortune_mult,
+                            "overdrive_bonus": crop_overdrive_bonus,
                             "special": sm_display
                         }
                     })
@@ -554,17 +610,23 @@ def get_leaderboard(
                 "infini_vacuum": infini_vacuum,
                 "dark_cacao": dark_cacao,
                 "hypercharge_level": hypercharge_level,
+                "hypercharge_rarity": hypercharge_rarity,
                 "affected_multiplier": affected_multiplier,
             },
             "yield_breakdown": {
                 "base_multiplier": 1.0,
                 "evergreen_chip_level": evergreen_chip_level,
+                "evergreen_chip_rarity": evergreen_chip_rarity,
                 "evergreen_bonus": evergreen_buff,
                 "greenhouse_yield_upgrade": gh_yield_upgrade,
                 "greenhouse_yield_bonus": gh_buff,
                 "unique_crops": unique_crops,
                 "unique_crop_bonus": unique_buff,
                 "wart_multiplier": wart_buff,
+                "overdrive_chip_level": overdrive_chip_level,
+                "overdrive_chip_rarity": overdrive_chip_rarity,
+                "overdrive_crop": normalized_overdrive_crop,
+                "overdrive_bonus": overdrive_bonus,
             },
             "speed_breakdown": {
                 "greenhouse_speed_upgrade": gh_speed_upgrade,
