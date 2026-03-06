@@ -2,7 +2,7 @@
 
 import { Fragment, useState, useEffect, useMemo, useRef } from "react";
 import { ModeToggle } from "@/components/mode-toggle";
-import { Coins, Sprout, Clock, Calculator, Loader2, ArrowUpRight, AlertTriangle, X, Info, Sparkles } from "lucide-react";
+import { Coins, Sprout, Clock, Calculator, Loader2, ArrowUpRight, AlertTriangle, X, Info, Sparkles, ChevronDown } from "lucide-react";
 import Image from "next/image";
 
 type OptimizationMode = "profit" | "smart" | "target";
@@ -185,6 +185,7 @@ const faqItems = [
       "Profit per Harvest is the profit from one full planted batch once everything is grown.",
       "Profit per Growth Cycle adds expected spawn time to the mutation's growth stages. Most mutations use a 25 percent spawn chance per garden growth cycle, so their expected spawn wait is 1 / 0.25 = 4 cycles.",
       "Lonelily uses its own rarer spawn estimate instead. Profit per Hour then converts those expected cycles into real time using the current garden cycle duration.",
+      "The Growth Cycles column only shows post-spawn growth stages, so instant mutations display as 0 Cycles while their timing metrics still include expected spawn wait.",
     ],
   },
   {
@@ -241,6 +242,7 @@ export default function Home() {
 
   // Modal State
   const [selectedMutation, setSelectedMutation] = useState<LeaderboardItem | null>(null);
+  const [openFaqQuestion, setOpenFaqQuestion] = useState<string | null>(faqItems[0].question);
 
   const displayCrops = [
     { key: "Wheat", label: "Wheat" },
@@ -514,9 +516,14 @@ export default function Home() {
   };
 
   const formatGrowthCyclesDisplay = (cycles: number) => {
-    if (!Number.isFinite(cycles) || cycles <= 0) return "0";
+    if (!Number.isFinite(cycles) || cycles <= 0) return "0 Cycles";
     if (cycles === 1) return "1 Cycle";
     return `${cycles} Cycles`;
+  };
+
+  const formatLifecycleDisplay = (hours: number, growthStages: number) => {
+    if (growthStages <= 0) return "Instant";
+    return formatDuration(hours);
   };
 
   const getGrowthCyclesLabel = (item: LeaderboardItem) => {
@@ -671,10 +678,10 @@ export default function Home() {
     : 0;
   const selectedMutationGrowthCycles = selectedMutation
     ? formatGrowthCyclesDisplay(selectedMutation.hourly?.g ?? selectedMutation.breakdown.growth_stages)
-    : "0";
+    : "0 Cycles";
   const selectedMutationLifecycle = selectedMutation
-    ? formatDuration(selectedMutation.breakdown.estimated_time_hours)
-    : "0m";
+    ? formatLifecycleDisplay(selectedMutation.breakdown.estimated_time_hours, selectedMutation.breakdown.growth_stages)
+    : "Instant";
 
 
 
@@ -1226,12 +1233,42 @@ export default function Home() {
                         </th>
                       )}
                       <th className="px-6 py-4 font-semibold text-right hidden md:table-cell">
-                        <button type="button" onClick={() => toggleSort("cycles")} className="inline-flex items-center gap-1">
-                          Growth Cycles <span aria-hidden="true">{sortIndicator("cycles")}</span>
-                        </button>
+                        <div className="inline-flex items-center justify-end gap-2">
+                          <button type="button" onClick={() => toggleSort("cycles")} className="inline-flex items-center gap-1">
+                            Growth Cycles <span aria-hidden="true">{sortIndicator("cycles")}</span>
+                          </button>
+                          <div className="group relative">
+                            <button
+                              type="button"
+                              tabIndex={0}
+                              aria-label="Growth cycles help"
+                              className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-neutral-500/50 text-[10px] leading-none cursor-help"
+                            >
+                              <Info className="h-3 w-3" />
+                            </button>
+                            <div className="absolute left-1/2 top-full z-20 mt-2 w-72 -translate-x-1/2 rounded bg-neutral-900 px-3 py-2 text-left text-[11px] font-normal normal-case tracking-normal text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                              <p className="leading-snug">Shows only the mutation&apos;s post-spawn growth stages. Expected spawn wait is already included in Profit / Growth Cycle and Profit / Hour.</p>
+                            </div>
+                          </div>
+                        </div>
                       </th>
                       <th className="px-6 py-4 font-semibold text-right hidden lg:table-cell">
-                        Time
+                        <div className="inline-flex items-center justify-end gap-2">
+                          <span>Time</span>
+                          <div className="group relative">
+                            <button
+                              type="button"
+                              tabIndex={0}
+                              aria-label="Lifecycle time help"
+                              className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-neutral-500/50 text-[10px] leading-none cursor-help"
+                            >
+                              <Info className="h-3 w-3" />
+                            </button>
+                            <div className="absolute left-1/2 top-full z-20 mt-2 w-64 -translate-x-1/2 rounded bg-neutral-900 px-3 py-2 text-left text-[11px] font-normal normal-case tracking-normal text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                              <p className="leading-snug">Lifecycle time is the post-spawn growth window only. Instant mutations show as Instant here.</p>
+                            </div>
+                          </div>
+                        </div>
                       </th>
                       <th className="px-6 py-4 font-semibold text-right hidden sm:table-cell">
                         <div className="inline-flex items-center justify-end gap-2">
@@ -1260,7 +1297,7 @@ export default function Home() {
                       <tr
                         key={item.mutationName}
                         onClick={() => setSelectedMutation(item)}
-                        title="Click to view setup requirements!"
+                        title="Click to view mutation breakdown"
                         className={`cursor-pointer border-b border-neutral-100 dark:border-neutral-800 last:border-0 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors ${idx === 0 ? 'bg-amber-50/50 dark:bg-amber-900/10' : ''}`}
                       >
                         <td className="px-6 py-4 text-center">
@@ -1303,13 +1340,19 @@ export default function Home() {
                           <td className="px-6 py-4 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
                             <div className="flex items-center justify-end gap-2">
                               {item.warning_messages && item.warning_messages.length > 0 && (
-                                <div className="group/warn relative" title={item.warning_messages.join("\n")}>
+                                <div className="group/warn relative">
                                   {(() => {
                                     const tone = getLeaderboardWarningTone(item);
                                     return (
                                       <>
-                                        <AlertTriangle className={`w-4 h-4 ${tone.icon}`} />
-                                        <div className={`pointer-events-none absolute right-full top-1/2 z-10 mr-3 hidden w-72 -translate-y-1/2 rounded-xl border p-3 text-left text-xs tracking-wide opacity-0 shadow-lg transition-opacity group-hover/warn:opacity-100 lg:block ${tone.panel}`}>
+                                        <button
+                                          type="button"
+                                          aria-label={`${tone.label}: ${item.warning_messages.join(" ")}`}
+                                          className="inline-flex items-center"
+                                        >
+                                          <AlertTriangle className={`w-4 h-4 ${tone.icon}`} />
+                                        </button>
+                                        <div className={`pointer-events-none absolute right-full top-1/2 z-10 mr-3 hidden w-72 -translate-y-1/2 rounded-xl border p-3 text-left text-xs tracking-wide opacity-0 shadow-lg transition-opacity group-hover/warn:opacity-100 group-focus-within/warn:opacity-100 lg:block ${tone.panel}`}>
                                           <p className={`mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] ${tone.heading}`}>
                                             {tone.label}
                                           </p>
@@ -1339,7 +1382,7 @@ export default function Home() {
                           {getGrowthCyclesLabel(item)}
                         </td>
                         <td className="px-6 py-4 text-right font-mono text-neutral-500 hidden lg:table-cell">
-                          {formatDuration(item.breakdown.estimated_time_hours)}
+                          {formatLifecycleDisplay(item.breakdown.estimated_time_hours, item.breakdown.growth_stages)}
                         </td>
                         <td className="px-6 py-4 text-right font-mono opacity-[0.65] hidden sm:table-cell">
                           {formatCoins(item.opt_cost)}
@@ -1372,19 +1415,26 @@ export default function Home() {
             <div className="px-5 py-4 sm:px-6">
               <div className="space-y-3">
                 {faqItems.map((item) => (
-                  <details key={item.question} className="group rounded-2xl border border-neutral-200/80 bg-neutral-50/80 dark:border-neutral-800 dark:bg-neutral-950/60">
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-4">
+                  <div key={item.question} className="rounded-2xl border border-neutral-200/80 bg-neutral-50/80 dark:border-neutral-800 dark:bg-neutral-950/60">
+                    <button
+                      type="button"
+                      onClick={() => setOpenFaqQuestion((current) => current === item.question ? null : item.question)}
+                      className="flex w-full items-center justify-between gap-4 px-4 py-4 text-left"
+                      aria-expanded={openFaqQuestion === item.question}
+                    >
                       <span className="text-sm font-bold text-neutral-950 dark:text-white">{item.question}</span>
-                      <span className="text-lg font-light text-neutral-400 transition-transform group-open:rotate-45">+</span>
-                    </summary>
-                    <div className="border-t border-neutral-200 px-4 py-4 dark:border-neutral-800">
-                      {item.answer.map((paragraph) => (
-                        <p key={paragraph} className="text-sm leading-6 text-neutral-600 dark:text-neutral-300">
-                          {paragraph}
-                        </p>
-                      ))}
-                    </div>
-                  </details>
+                      <ChevronDown className={`h-4 w-4 shrink-0 text-neutral-400 transition-transform ${openFaqQuestion === item.question ? "rotate-180" : ""}`} />
+                    </button>
+                    {openFaqQuestion === item.question && (
+                      <div className="border-t border-neutral-200 px-4 py-4 dark:border-neutral-800">
+                        {item.answer.map((paragraph) => (
+                          <p key={paragraph} className="text-sm leading-6 text-neutral-600 dark:text-neutral-300">
+                            {paragraph}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             </div>
