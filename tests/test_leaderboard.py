@@ -92,7 +92,7 @@ class LeaderboardTests(unittest.TestCase):
             self.assertAlmostEqual(mutation["profit_per_hour"], model_hour, places=6)
 
     @patch("api.index.get_bazaar_prices", return_value={})
-    def test_public_leaderboard_omits_removed_cycle_metrics(self, _mock_prices):
+    def test_public_leaderboard_exposes_growth_cycle_metric_and_omits_removed_cycle_metrics(self, _mock_prices):
         result = get_leaderboard(
             plots=3,
             fortune=2500,
@@ -106,12 +106,44 @@ class LeaderboardTests(unittest.TestCase):
         )
 
         for mutation in result["leaderboard"]:
+            growth_stages = mutation["breakdown"]["growth_stages"]
+            if growth_stages > 0:
+                self.assertAlmostEqual(
+                    mutation["profit_per_growth_cycle"],
+                    mutation["profit"] / growth_stages,
+                    places=6,
+                )
+            else:
+                self.assertIsNone(mutation["profit_per_growth_cycle"])
+            self.assertIn("warning_messages", mutation)
             self.assertNotIn("profit_per_cycle", mutation)
             self.assertNotIn("break_even_cycles", mutation)
             self.assertNotIn("break_even_cycles_display", mutation)
             self.assertNotIn("profit_per_cycle", mutation["hourly"])
             self.assertNotIn("break_even_cycles", mutation["hourly"])
             self.assertNotIn("break_even_cycles_display", mutation["hourly"])
+
+    @patch("api.index.get_bazaar_prices", return_value={})
+    def test_special_mutations_expose_warning_messages(self, _mock_prices):
+        result = get_leaderboard(
+            plots=3,
+            fortune=2500,
+            gh_upgrade=9,
+            unique_crops=12,
+            mode="profit",
+            setup_mode="buy_order",
+            sell_mode="sell_offer",
+            target_crop=None,
+            maxed_crops="",
+        )
+
+        messages_by_name = {
+            mutation["mutationName"]: mutation.get("warning_messages", [])
+            for mutation in result["leaderboard"]
+        }
+        self.assertTrue(any("Devourer can spread" in msg for msg in messages_by_name["Devourer"]))
+        self.assertTrue(any("Magic Jellybean takes much longer" in msg for msg in messages_by_name["Magic Jellybean"]))
+        self.assertTrue(any("All-in Aloe can reset" in msg for msg in messages_by_name["All-in Aloe"]))
 
     @patch("api.index.get_bazaar_prices", return_value={"Magic Jellybean": {"buyPrice": 1000, "sellPrice": 900}})
     def test_profit_per_hour_includes_harvest_multiplier_in_v_net(self, _mock_prices):
@@ -231,6 +263,7 @@ class LeaderboardTests(unittest.TestCase):
         self.assertIsNotNone(lonelily_yield)
         # 25 per plot * 3 plots * 0.02 chance over 1 cycle
         self.assertAlmostEqual(lonelily_yield["amount"], 1.5, places=6)
+        self.assertAlmostEqual(lonelily["profit_per_growth_cycle"], lonelily["profit"], places=6)
 
     @patch("api.index.get_bazaar_prices", return_value={})
     def test_all_in_aloe_uses_reset_adjusted_special_multiplier_at_stage_14(self, _mock_prices):

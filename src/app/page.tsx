@@ -345,6 +345,11 @@ export default function Home() {
     return `${safe >= 0 ? "+" : "-"}${formatCoins(Math.abs(safe))}`;
   };
 
+  const formatGrowthCycleProfit = (num: number | null | undefined) => {
+    if (typeof num !== "number" || !Number.isFinite(num)) return "N/A";
+    return formatCoins(num);
+  };
+
   const formatDuration = (hours: number) => {
     const safeHours = Number.isFinite(hours) ? hours : 0;
     const totalMinutes = Math.max(0, Math.round(safeHours * 60));
@@ -427,6 +432,7 @@ export default function Home() {
 
   const sortValue = (item: LeaderboardItem, key: SortKey) => {
     if (key === "mutation") return item.mutationName.toLowerCase();
+    if (key === "growth_cycle_profit") return item.profit_per_growth_cycle ?? null;
     if (key === "cycles") return item.hourly?.g ?? item.breakdown.growth_stages;
     if (key === "setup") return item.opt_cost;
     if (key === "value") {
@@ -445,6 +451,12 @@ export default function Home() {
   const sortedLeaderboard = [...visibleLeaderboard].sort((a, b) => {
     const av = sortValue(a, sortKey);
     const bv = sortValue(b, sortKey);
+    const aMissing = av === null || av === undefined || (typeof av === "number" && !Number.isFinite(av));
+    const bMissing = bv === null || bv === undefined || (typeof bv === "number" && !Number.isFinite(bv));
+    if (aMissing || bMissing) {
+      if (aMissing && bMissing) return 0;
+      return aMissing ? 1 : -1;
+    }
     let cmp = 0;
     if (typeof av === "string" && typeof bv === "string") cmp = av.localeCompare(bv);
     else cmp = Number(av) - Number(bv);
@@ -854,6 +866,13 @@ export default function Home() {
                           </button>
                         </th>
                       )}
+                      {mode === "profit" && (
+                        <th className="px-6 py-4 font-semibold text-right text-sky-600 dark:text-sky-400 hidden lg:table-cell">
+                          <button type="button" onClick={() => toggleSort("growth_cycle_profit")} className="inline-flex items-center gap-1">
+                            Profit / Growth Cycle <span aria-hidden="true">{sortIndicator("growth_cycle_profit")}</span>
+                          </button>
+                        </th>
+                      )}
                       <th className="px-6 py-4 font-semibold text-right hidden md:table-cell">
                         <button type="button" onClick={() => toggleSort("cycles")} className="inline-flex items-center gap-1">
                           Growth Cycles <span aria-hidden="true">{sortIndicator("cycles")}</span>
@@ -931,24 +950,25 @@ export default function Home() {
                         ) : (
                           <td className="px-6 py-4 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
                             <div className="flex items-center justify-end gap-2">
-                              {item.warning && (
+                              {item.warning_messages && item.warning_messages.length > 0 && (
                                 <div className="group relative">
                                   <AlertTriangle className="w-4 h-4 text-yellow-500 hover:text-yellow-600" />
-                                  <div className="absolute bottom-full right-0 mb-2 w-48 p-2 bg-neutral-900 text-xs text-white rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 text-center font-sans tracking-wide">
-                                    Warning: Spreads are wide. Double check orders!
-                                  </div>
-                                </div>
-                              )}
-                              {item.mutationName === "Devourer" && (
-                                <div className="group relative">
-                                  <AlertTriangle className="w-4 h-4 text-red-500 hover:text-red-400" />
-                                  <div className="absolute bottom-full right-0 mb-2 w-64 p-2 bg-neutral-900 text-xs text-white rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 text-left font-sans tracking-wide">
-                                    This crop destroys surrounding crops over time. You must remove adjacent blocks to prevent spread. It is not advised to try and grow all 16 at once but it is possible.
+                                  <div className="absolute bottom-full right-0 z-10 mb-2 w-72 rounded bg-neutral-900 p-3 text-left text-xs tracking-wide text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                                    {item.warning_messages.map((message) => (
+                                      <p key={message} className="mb-2 leading-relaxed last:mb-0">
+                                        {message}
+                                      </p>
+                                    ))}
                                   </div>
                                 </div>
                               )}
                               {formatCoins(mode === "target" ? item.score : item.profit)}
                             </div>
+                          </td>
+                        )}
+                        {mode === "profit" && (
+                          <td className="px-6 py-4 text-right font-mono font-bold text-sky-600 dark:text-sky-400 hidden lg:table-cell">
+                            {formatGrowthCycleProfit(item.profit_per_growth_cycle)}
                           </td>
                         )}
                         <td className="px-6 py-4 text-right font-mono text-neutral-500 hidden md:table-cell">
@@ -971,6 +991,33 @@ export default function Home() {
 
           <div className="rounded-xl border border-amber-200/70 bg-amber-50/80 px-4 py-3 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
             Results are based on community-tested assumptions; verify key values in-game before large orders.
+          </div>
+
+          <div className="rounded-2xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+            <details className="group">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 sm:px-6">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 rounded-xl bg-sky-100 p-2 text-sky-600 dark:bg-sky-900/30 dark:text-sky-300">
+                    <Info className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-neutral-950 dark:text-white">How are results calculated?</h3>
+                    <p className="text-sm text-neutral-500 dark:text-neutral-400">Open a short guide to the main profit, spawn, and warning assumptions.</p>
+                  </div>
+                </div>
+                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-400">Open FAQ</span>
+              </summary>
+              <div className="border-t border-neutral-200 px-5 py-5 dark:border-neutral-800 sm:px-6">
+                <div className="grid gap-3 lg:grid-cols-2">
+                  {faqItems.map((item) => (
+                    <div key={item.question} className="rounded-2xl border border-neutral-200/80 bg-neutral-50/80 p-4 dark:border-neutral-800 dark:bg-neutral-950/60">
+                      <h4 className="text-sm font-bold text-neutral-950 dark:text-white">{item.question}</h4>
+                      <p className="mt-2 text-sm leading-6 text-neutral-600 dark:text-neutral-300">{item.answer}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </details>
           </div>
         </main>
       </div>

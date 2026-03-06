@@ -26,6 +26,10 @@ def test_leaderboard_exposes_profit_models_and_no_nan(_mock_prices):
     sample = next((m for m in result["leaderboard"] if m["mutationName"] == "Magic Jellybean"), result["leaderboard"][0])
     pm = sample.get("profit_models")
     assert pm is not None
+    assert "profit_per_growth_cycle" in sample
+    assert math.isfinite(sample["profit_per_growth_cycle"])
+    assert sample["profit_per_growth_cycle"] == sample["profit"] / sample["breakdown"]["growth_stages"]
+    assert "warning_messages" in sample
     assert "profit_per_cycle" not in sample
     assert "break_even_cycles" not in sample
     assert "break_even_cycles_display" not in sample
