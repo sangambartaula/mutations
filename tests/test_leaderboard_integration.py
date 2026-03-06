@@ -22,6 +22,9 @@ def test_leaderboard_exposes_profit_models_and_no_nan(_mock_prices):
 
     assert "leaderboard" in result
     assert len(result["leaderboard"]) > 0
+    assert result["metadata"]["yield_breakdown"]["greenhouse_yield_upgrade"] == 9
+    assert result["metadata"]["yield_breakdown"]["evergreen_chip_level"] == 20
+    assert result["metadata"]["speed_breakdown"]["greenhouse_speed_upgrade"] == 9
 
     sample = next((m for m in result["leaderboard"] if m["mutationName"] == "Magic Jellybean"), result["leaderboard"][0])
     pm = sample.get("profit_models")

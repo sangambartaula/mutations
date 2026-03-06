@@ -34,6 +34,71 @@ class LeaderboardTests(unittest.TestCase):
         self.assertEqual(breakdown["effective_fortune"], 610)
 
     @patch("api.index.get_bazaar_prices", return_value={})
+    def test_split_greenhouse_and_evergreen_controls_affect_backend_math(self, _mock_prices):
+        maxed = get_leaderboard(
+            plots=3,
+            fortune=2500,
+            gh_yield_upgrade=9,
+            gh_speed_upgrade=9,
+            evergreen_chip_level=20,
+            unique_crops=12,
+            mode="profit",
+            setup_mode="buy_order",
+            sell_mode="sell_offer",
+            target_crop=None,
+            maxed_crops="",
+        )
+        reduced = get_leaderboard(
+            plots=3,
+            fortune=2500,
+            gh_yield_upgrade=0,
+            gh_speed_upgrade=0,
+            evergreen_chip_level=0,
+            unique_crops=12,
+            mode="profit",
+            setup_mode="buy_order",
+            sell_mode="sell_offer",
+            target_crop=None,
+            maxed_crops="",
+        )
+
+        self.assertLess(maxed["metadata"]["cycle_time_hours"], reduced["metadata"]["cycle_time_hours"])
+        self.assertEqual(maxed["metadata"]["yield_breakdown"]["evergreen_bonus"], 0.6)
+        self.assertEqual(reduced["metadata"]["yield_breakdown"]["evergreen_bonus"], 0.0)
+        self.assertEqual(maxed["metadata"]["speed_breakdown"]["greenhouse_speed_upgrade"], 9)
+        self.assertEqual(reduced["metadata"]["speed_breakdown"]["greenhouse_speed_upgrade"], 0)
+
+        devourer_maxed = next((m for m in maxed["leaderboard"] if m["mutationName"] == "Devourer"), None)
+        devourer_reduced = next((m for m in reduced["leaderboard"] if m["mutationName"] == "Devourer"), None)
+        self.assertIsNotNone(devourer_maxed)
+        self.assertIsNotNone(devourer_reduced)
+
+        pumpkin_maxed = next((y for y in devourer_maxed["breakdown"]["yields"] if y["name"] == "Pumpkin"), None)
+        pumpkin_reduced = next((y for y in devourer_reduced["breakdown"]["yields"] if y["name"] == "Pumpkin"), None)
+        self.assertIsNotNone(pumpkin_maxed)
+        self.assertIsNotNone(pumpkin_reduced)
+        self.assertEqual(pumpkin_maxed["math"]["evergreen_buff"], 0.6)
+        self.assertEqual(pumpkin_reduced["math"]["evergreen_buff"], 0.0)
+        self.assertGreater(pumpkin_maxed["amount"], pumpkin_reduced["amount"])
+
+    @patch("api.index.get_bazaar_prices", return_value={})
+    def test_legacy_greenhouse_upgrade_still_feeds_split_defaults(self, _mock_prices):
+        legacy = get_leaderboard(
+            plots=3,
+            fortune=2500,
+            gh_upgrade=4,
+            unique_crops=12,
+            mode="profit",
+            setup_mode="buy_order",
+            sell_mode="sell_offer",
+            target_crop=None,
+            maxed_crops="",
+        )
+
+        self.assertEqual(legacy["metadata"]["yield_breakdown"]["greenhouse_yield_upgrade"], 4)
+        self.assertEqual(legacy["metadata"]["speed_breakdown"]["greenhouse_speed_upgrade"], 4)
+
+    @patch("api.index.get_bazaar_prices", return_value={})
     def test_veilshroom_is_included_with_recipe(self, _mock_prices):
         result = get_leaderboard(
             plots=3,

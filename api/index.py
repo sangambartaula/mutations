@@ -190,7 +190,9 @@ def ping():
 def get_leaderboard(
     plots: int = Query(1, ge=1, le=3),
     fortune: int = Query(2500, ge=0),
-    gh_upgrade: int = Query(9, ge=0, le=9),
+    gh_upgrade: int | None = Query(None, ge=0, le=9),
+    gh_yield_upgrade: int | None = Query(None, ge=0, le=9),
+    gh_speed_upgrade: int | None = Query(None, ge=0, le=9),
     unique_crops: int = Query(12, ge=0, le=12),
     mode: str = Query("profit"),  # "profit", "smart", "target"
     setup_mode: str = Query("insta_buy"), # "insta_buy" or "buy_order"
@@ -205,9 +207,15 @@ def get_leaderboard(
     dark_cacao: bool = Query(False),
     improved_harvest_boost: bool = Query(True),
     hypercharge_level: int = Query(0, ge=0, le=20),
+    evergreen_chip_level: int = Query(20, ge=0, le=20),
     per_harvest_cost: float = Query(0.0, ge=0.0),
 ) -> Dict[str, Any]:
     # Normalize FastAPI Query defaults when function is called directly in tests/scripts.
+    def normalized_int(value: Any, *, default: int, minimum: int, maximum: int) -> int:
+        if isinstance(value, bool) or not isinstance(value, int):
+            return default
+        return max(minimum, min(maximum, value))
+
     if not isinstance(maxed_crops, str):
         maxed_crops = ""
     if not isinstance(mutation_chance, (int, float)):
@@ -216,8 +224,12 @@ def get_leaderboard(
         harvest_mode = "full"
     if not isinstance(custom_time_hours, (int, float)):
         custom_time_hours = 24.0
-    if not isinstance(hypercharge_level, int):
-        hypercharge_level = 0
+    hypercharge_level = normalized_int(hypercharge_level, default=0, minimum=0, maximum=20)
+    evergreen_chip_level = normalized_int(evergreen_chip_level, default=20, minimum=0, maximum=20)
+    legacy_gh_upgrade = normalized_int(gh_upgrade, default=9, minimum=0, maximum=9)
+    gh_yield_upgrade = normalized_int(gh_yield_upgrade, default=legacy_gh_upgrade, minimum=0, maximum=9)
+    gh_speed_upgrade = normalized_int(gh_speed_upgrade, default=legacy_gh_upgrade, minimum=0, maximum=9)
+    unique_crops = normalized_int(unique_crops, default=12, minimum=0, maximum=12)
     if not isinstance(per_harvest_cost, (int, float)):
         per_harvest_cost = 0.0
     
@@ -233,15 +245,17 @@ def get_leaderboard(
     
     # Cycle Time Math
     base_cycle_hours = 4.0
-    gh_reduction = (gh_upgrade / 9.0) * 0.25
+    gh_speed_reduction = (gh_speed_upgrade / 9.0) * 0.25
     unique_reduction = (unique_crops / 12.0) * 0.30
-    cycle_time_hours = base_cycle_hours * (1.0 - gh_reduction - unique_reduction)
+    cycle_time_hours = base_cycle_hours * (1.0 - gh_speed_reduction - unique_reduction)
     
-    # Additive Base (1.0) + Microchip (0.6) = 1.6
-    # GH Upgrades scales to +0.20, Unique Crops scales to +0.36 max (Total +0.56)
-    gh_buff = (gh_upgrade / 9.0) * 0.20
+    # Additive base yield is modeled as:
+    # Base (1.0) + Evergreen Chip (up to +0.60) + Greenhouse Yield (up to +0.20)
+    # + Unique Crops (up to +0.36).
+    evergreen_buff = (evergreen_chip_level / 20.0) * 0.60
+    gh_buff = (gh_yield_upgrade / 9.0) * 0.20
     unique_buff = (unique_crops / 12.0) * 0.36
-    additive_base = 1.6 + gh_buff + unique_buff
+    additive_base = 1.0 + evergreen_buff + gh_buff + unique_buff
     
     # Buff fortune model:
     # Harvest Harbinger (+50) is unaffected by Hypercharge.
@@ -376,6 +390,7 @@ def get_leaderboard(
                         "math": {
                             "base": bd_display,
                             "limit": effective_limit,
+                            "evergreen_buff": evergreen_buff,
                             "gh_buff": gh_buff,
                             "unique_buff": unique_buff,
                             "wart_buff": wart_buff,
@@ -397,6 +412,7 @@ def get_leaderboard(
                 "math": {
                     "base": 1.0,
                     "limit": effective_limit,
+                    "evergreen_buff": 0.0,
                     "gh_buff": 0.0,
                     "unique_buff": 0.0,
                     "wart_buff": 1.0,
@@ -539,6 +555,21 @@ def get_leaderboard(
                 "dark_cacao": dark_cacao,
                 "hypercharge_level": hypercharge_level,
                 "affected_multiplier": affected_multiplier,
+            },
+            "yield_breakdown": {
+                "base_multiplier": 1.0,
+                "evergreen_chip_level": evergreen_chip_level,
+                "evergreen_bonus": evergreen_buff,
+                "greenhouse_yield_upgrade": gh_yield_upgrade,
+                "greenhouse_yield_bonus": gh_buff,
+                "unique_crops": unique_crops,
+                "unique_crop_bonus": unique_buff,
+                "wart_multiplier": wart_buff,
+            },
+            "speed_breakdown": {
+                "greenhouse_speed_upgrade": gh_speed_upgrade,
+                "greenhouse_speed_reduction": gh_speed_reduction,
+                "unique_speed_reduction": unique_reduction,
             },
         }
     }
