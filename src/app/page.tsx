@@ -2,13 +2,13 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { ModeToggle } from "@/components/mode-toggle";
-import { Coins, Sprout, Clock, Calculator, Loader2, ArrowUpRight, AlertTriangle, X, Info } from "lucide-react";
+import { Coins, Sprout, Clock, Calculator, Loader2, ArrowUpRight, AlertTriangle, X, Info, Package, TrendingUp, Sparkles } from "lucide-react";
 import Image from "next/image";
 
 type OptimizationMode = "profit" | "smart" | "target";
 type SetupMode = "buy_order" | "insta_buy";
 type SellMode = "sell_offer" | "insta_sell";
-type SortKey = "rank" | "mutation" | "value" | "cycle_profit" | "break_even" | "cycles" | "setup";
+type SortKey = "rank" | "mutation" | "value" | "cycles" | "setup";
 type SortDirection = "asc" | "desc";
 
 type YieldMath = {
@@ -50,10 +50,7 @@ type LeaderboardItem = {
   mutationName: string;
   score: number;
   profit: number;
-  profit_per_cycle: number;
   profit_per_hour: number;
-  break_even_cycles?: number | null;
-  break_even_cycles_display?: string;
   opt_cost: number;
   revenue: number;
   warning: boolean;
@@ -105,15 +102,6 @@ const toMutationLabel = (mutation: string) => {
 };
 const toMutationIconPath = (mutationName: string) =>
   `/icons/mutations/${mutationName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}.png`;
-const avgValuePerCycleTooltipLines = [
-  "Long-run expected value generated per global growth cycle.",
-  "This metric already accounts for spawn chance and growth delay.",
-  "Growth Cycles shown in the table represent maturation time after spawn and are NOT the number of cycles required to break even.",
-];
-const breakEvenCyclesTooltipLines = [
-  "Cycles needed to recoup setup cost at the long-run rate.",
-  "Includes expected spawn-wait time (1/p) and growth delay (g).",
-];
 const setupCostNote = "Some mutations decay after a few days, so setup cost may recur.";
 
 export default function Home() {
@@ -324,6 +312,11 @@ export default function Home() {
     return new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(safe);
   };
 
+  const formatSignedCoins = (num: number) => {
+    const safe = Number.isFinite(num) ? num : 0;
+    return `${safe >= 0 ? "+" : "-"}${formatCoins(Math.abs(safe))}`;
+  };
+
   const formatDuration = (hours: number) => {
     const safeHours = Number.isFinite(hours) ? hours : 0;
     const totalMinutes = Math.max(0, Math.round(safeHours * 60));
@@ -401,13 +394,11 @@ export default function Home() {
       return;
     }
     setSortKey(key);
-    setSortDirection((key === "mutation" || key === "break_even") ? "asc" : "desc");
+    setSortDirection(key === "mutation" ? "asc" : "desc");
   };
 
   const sortValue = (item: LeaderboardItem, key: SortKey) => {
     if (key === "mutation") return item.mutationName.toLowerCase();
-    if (key === "cycle_profit") return mode === "profit" ? item.profit_per_cycle : item.score;
-    if (key === "break_even") return item.break_even_cycles ?? null;
     if (key === "cycles") return item.hourly?.g ?? item.breakdown.growth_stages;
     if (key === "setup") return item.opt_cost;
     if (key === "value") {
@@ -424,19 +415,6 @@ export default function Home() {
   };
 
   const sortedLeaderboard = [...visibleLeaderboard].sort((a, b) => {
-    if (sortKey === "break_even") {
-      const av = sortValue(a, sortKey);
-      const bv = sortValue(b, sortKey);
-      const aNever = av === null || !Number.isFinite(Number(av));
-      const bNever = bv === null || !Number.isFinite(Number(bv));
-
-      if (aNever !== bNever) return aNever ? 1 : -1; // "Never" always at bottom
-      if (aNever && bNever) return 0;
-
-      const cmpBreakEven = Number(av) - Number(bv);
-      return sortDirection === "asc" ? cmpBreakEven : -cmpBreakEven;
-    }
-
     const av = sortValue(a, sortKey);
     const bv = sortValue(b, sortKey);
     let cmp = 0;
@@ -450,19 +428,19 @@ export default function Home() {
     return sortDirection === "asc" ? "↑" : "↓";
   };
 
-  const formatBreakEvenCycles = (item: LeaderboardItem) => {
-    if (item.break_even_cycles_display && item.break_even_cycles_display.length > 0) {
-      return item.break_even_cycles_display;
-    }
-    const raw = item.break_even_cycles;
-    if (typeof raw !== "number" || !Number.isFinite(raw) || raw <= 0) return "Never";
-    return Math.ceil(raw).toLocaleString("en-US");
-  };
-
   const scrollLeaderboardBy = (pixels: number) => {
     if (!tableScrollRef.current) return;
     tableScrollRef.current.scrollBy({ left: pixels, behavior: "smooth" });
   };
+
+  const selectedMutationNetProfit = selectedMutation
+    ? selectedMutation.breakdown.total_revenue - selectedMutation.breakdown.total_setup_cost
+    : 0;
+  const selectedMutationCycleDuration = data ? formatDuration(data.metadata.cycle_time_hours) : "0m";
+  const selectedMutationGrowthCycles = selectedMutation
+    ? formatGrowthCyclesDisplay(selectedMutation.hourly?.g ?? selectedMutation.breakdown.growth_stages)
+    : "0";
+  const selectedMutationYieldCount = selectedMutation?.breakdown.yields.length ?? 0;
 
 
 
@@ -848,58 +826,6 @@ export default function Home() {
                           </button>
                         </th>
                       )}
-                      {mode === "profit" && (
-                        <th className="px-6 py-4 font-semibold text-right text-sky-600 dark:text-sky-400 hidden lg:table-cell">
-                          <div className="inline-flex items-center justify-end gap-2">
-                            <button type="button" onClick={() => toggleSort("cycle_profit")} className="inline-flex items-center gap-1">
-                              Avg Value / Cycle <span aria-hidden="true">{sortIndicator("cycle_profit")}</span>
-                            </button>
-                            <div className="group relative">
-                              <button
-                                type="button"
-                                tabIndex={0}
-                                aria-label="Average value per cycle info"
-                                className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-sky-500/50 text-[10px] leading-none cursor-help"
-                              >
-                                <Info className="h-3 w-3" />
-                              </button>
-                              <div className="absolute left-1/2 top-full z-20 mt-2 w-80 -translate-x-1/2 rounded bg-neutral-900 px-3 py-2 text-left text-[11px] font-normal normal-case tracking-normal text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-                                {avgValuePerCycleTooltipLines.map((line) => (
-                                  <p key={line} className="leading-snug">
-                                    {line}
-                                  </p>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        </th>
-                      )}
-                      {mode === "profit" && (
-                        <th className="px-6 py-4 font-semibold text-right text-cyan-600 dark:text-cyan-400 hidden xl:table-cell">
-                          <div className="inline-flex items-center justify-end gap-2">
-                            <button type="button" onClick={() => toggleSort("break_even")} className="inline-flex items-center gap-1">
-                              Break-even (Cycles) <span aria-hidden="true">{sortIndicator("break_even")}</span>
-                            </button>
-                            <div className="group relative">
-                              <button
-                                type="button"
-                                tabIndex={0}
-                                aria-label="Break-even cycles info"
-                                className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-cyan-500/50 text-[10px] leading-none cursor-help"
-                              >
-                                <Info className="h-3 w-3" />
-                              </button>
-                              <div className="absolute left-1/2 top-full z-20 mt-2 w-72 -translate-x-1/2 rounded bg-neutral-900 px-3 py-2 text-left text-[11px] font-normal normal-case tracking-normal text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-                                {breakEvenCyclesTooltipLines.map((line) => (
-                                  <p key={line} className="leading-snug">
-                                    {line}
-                                  </p>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        </th>
-                      )}
                       <th className="px-6 py-4 font-semibold text-right hidden md:table-cell">
                         <button type="button" onClick={() => toggleSort("cycles")} className="inline-flex items-center gap-1">
                           Growth Cycles <span aria-hidden="true">{sortIndicator("cycles")}</span>
@@ -997,16 +923,6 @@ export default function Home() {
                             </div>
                           </td>
                         )}
-                        {mode === "profit" && (
-                          <td className="px-6 py-4 text-right font-mono font-bold text-sky-600 dark:text-sky-400 hidden lg:table-cell">
-                            {formatCoins(item.profit_per_cycle)}
-                          </td>
-                        )}
-                        {mode === "profit" && (
-                          <td className="px-6 py-4 text-right font-mono font-bold text-cyan-600 dark:text-cyan-400 hidden xl:table-cell">
-                            {formatBreakEvenCycles(item)}
-                          </td>
-                        )}
                         <td className="px-6 py-4 text-right font-mono text-neutral-500 hidden md:table-cell">
                           {getGrowthCyclesLabel(item)}
                         </td>
@@ -1034,136 +950,292 @@ export default function Home() {
       {/* Modal Overlay */}
       {selectedMutation && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setSelectedMutation(null)}>
-          <div className="bg-white dark:bg-neutral-900 rounded-2xl w-full max-w-lg max-h-[90vh] shadow-2xl border border-neutral-200 dark:border-neutral-800 overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="p-6 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between bg-neutral-50/50 dark:bg-neutral-900/50">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 shrink-0 flex items-center justify-center bg-emerald-100 dark:bg-emerald-900/30 rounded-xl border border-emerald-200 dark:border-emerald-800 text-2xl shadow-sm">
-                  <Image
-                    src={toMutationIconPath(selectedMutation.mutationName)}
-                    alt={`${selectedMutation.mutationName} icon`}
-                    width={28}
-                    height={28}
-                    className="w-7 h-7 object-contain"
-                    onError={(e) => {
-                      const target = e.currentTarget;
-                      target.style.display = "none";
-                      target.parentElement?.classList.add("icon-fallback");
-                    }}
-                  />
-                  <Sprout className="w-6 h-6 text-emerald-600 dark:text-emerald-400 icon-fallback-glyph hidden" />
+          <div className="relative flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-neutral-200/80 bg-white/95 shadow-2xl shadow-neutral-950/10 backdrop-blur dark:border-neutral-800 dark:bg-neutral-950/95" onClick={e => e.stopPropagation()}>
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.18),transparent_55%),radial-gradient(circle_at_top_right,_rgba(59,130,246,0.16),transparent_45%)] dark:bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.24),transparent_55%),radial-gradient(circle_at_top_right,_rgba(59,130,246,0.22),transparent_45%)]" />
+            <div className="relative border-b border-neutral-200/70 bg-white/65 px-6 py-6 backdrop-blur dark:border-neutral-800 dark:bg-neutral-950/65 sm:px-8">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-4">
+                  <div className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-emerald-200/70 bg-gradient-to-br from-emerald-100 via-white to-emerald-50 text-2xl shadow-sm dark:border-emerald-800/80 dark:from-emerald-950/70 dark:via-neutral-900 dark:to-emerald-900/30">
+                    <div className="absolute h-10 w-10 rounded-full bg-emerald-500/10 blur-xl dark:bg-emerald-400/10" aria-hidden="true" />
+                    <div className="relative flex h-full w-full items-center justify-center">
+                      <Image
+                        src={toMutationIconPath(selectedMutation.mutationName)}
+                        alt={`${selectedMutation.mutationName} icon`}
+                        width={28}
+                        height={28}
+                        className="w-7 h-7 object-contain"
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          target.style.display = "none";
+                          target.parentElement?.classList.add("icon-fallback");
+                        }}
+                      />
+                      <Sprout className="w-6 h-6 text-emerald-600 dark:text-emerald-400 icon-fallback-glyph hidden" />
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-emerald-600/80 dark:text-emerald-300/75">Mutation Breakdown</p>
+                      <h3 className="mt-2 text-2xl font-black tracking-tight text-neutral-950 dark:text-white">{toMutationLabel(selectedMutation.mutationName)}</h3>
+                      <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+                        Harvest snapshot, setup cost, and expected value for {plots} placed plot{plots > 1 ? "s" : ""}.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
+                        {selectedMutation.limit} total placed
+                      </span>
+                      <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700 dark:border-sky-800 dark:bg-sky-900/30 dark:text-sky-300">
+                        {selectedMutationYieldCount} yield line{selectedMutationYieldCount === 1 ? "" : "s"}
+                      </span>
+                      <span className="rounded-full border border-neutral-200 bg-white/80 px-3 py-1 text-xs font-semibold text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900/70 dark:text-neutral-300">
+                        ~{selectedMutationCycleDuration} cycle
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-xl font-bold">{toMutationLabel(selectedMutation.mutationName)} Breakdown</h3>
-                  <p className="text-sm text-neutral-500">For {plots} Placed Plot{plots > 1 ? 's' : ''}</p>
-                </div>
+                <button className="rounded-full border border-neutral-200/80 bg-white/80 p-2 text-neutral-400 transition-colors hover:text-neutral-700 dark:border-neutral-700 dark:bg-neutral-900/70 dark:hover:text-neutral-200" onClick={() => setSelectedMutation(null)}>
+                  <X className="w-5 h-5" />
+                </button>
               </div>
-              <button className="text-neutral-400 hover:text-neutral-600 transition-colors p-1" onClick={() => setSelectedMutation(null)}>
-                <X className="w-5 h-5" />
-              </button>
             </div>
 
-            <div className="p-6 space-y-6 overflow-y-auto custom-scrollbar">
-              <div className="bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/30 rounded-xl p-4 text-sm text-emerald-800 dark:text-emerald-200">
-                You can plant <span className="font-bold">{selectedMutation.breakdown.base_limit}x {toMutationLabel(selectedMutation.mutationName)}</span> in 1 Plot.
-                <br />With {plots} plot(s) total ({selectedMutation.limit}x {toMutationLabel(selectedMutation.mutationName)}), {selectedMutation.breakdown.ingredients.length === 0 ? "this requires no ingredients!" : "this requires:"}
-              </div>
-              {selectedMutation.mutationName === "Devourer" && (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 text-sm text-red-800 dark:text-red-200">
-                  This crop destroys surrounding crops over time. You must remove adjacent blocks to prevent spread. It is not advised to try and grow all 16 at once but it is possible.
+            <div className="relative overflow-y-auto px-6 py-6 custom-scrollbar sm:px-8">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl border border-amber-200/70 bg-gradient-to-br from-amber-50 via-white to-white p-4 shadow-sm dark:border-amber-900/40 dark:from-amber-950/30 dark:via-neutral-900 dark:to-neutral-900">
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-300">
+                    <Package className="h-4 w-4" />
+                    Setup Cost
+                  </div>
+                  <div className="mt-3 text-2xl font-black font-mono text-amber-600 dark:text-amber-300">
+                    {formatCoins(selectedMutation.breakdown.total_setup_cost)}
+                  </div>
+                  <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">One-time ingredient spend for this placement plan.</p>
                 </div>
-              )}
+                <div className="rounded-2xl border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-white p-4 shadow-sm dark:border-emerald-900/40 dark:from-emerald-950/30 dark:via-neutral-900 dark:to-neutral-900">
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
+                    <Coins className="h-4 w-4" />
+                    Batch Revenue
+                  </div>
+                  <div className="mt-3 text-2xl font-black font-mono text-emerald-600 dark:text-emerald-300">
+                    +{formatCoins(selectedMutation.breakdown.total_revenue)}
+                  </div>
+                  <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">Expected total value when the batch is harvested.</p>
+                </div>
+                <div className={`rounded-2xl border p-4 shadow-sm ${selectedMutationNetProfit >= 0
+                  ? "border-emerald-300/70 bg-gradient-to-br from-emerald-500 via-emerald-500 to-teal-500 text-white shadow-emerald-500/20"
+                  : "border-red-300/70 bg-gradient-to-br from-red-500 via-red-500 to-rose-500 text-white shadow-red-500/20"
+                  }`}>
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/80">
+                    <TrendingUp className="h-4 w-4" />
+                    Net / Harvest
+                  </div>
+                  <div className="mt-3 text-2xl font-black font-mono">
+                    {formatSignedCoins(selectedMutationNetProfit)}
+                  </div>
+                  <p className="mt-1 text-xs text-white/75">Revenue minus setup cost for one full harvest batch.</p>
+                </div>
+              </div>
 
-              {selectedMutation.breakdown.ingredients.length > 0 && (
-                <div className="space-y-3">
-                  {selectedMutation.breakdown.ingredients.map((ing) => (
-                    <div key={ing.name} className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-100 dark:border-neutral-800">
-                      <div className="flex items-center gap-3">
-                        <span className="font-medium">{ing.amount}x <span className="text-emerald-700 dark:text-emerald-300">{toCropLabel(ing.name)}</span></span>
+              <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,0.86fr)_minmax(0,1.14fr)]">
+                <section className="space-y-4">
+                  <div className="rounded-3xl border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-emerald-50/60 p-5 shadow-sm dark:border-emerald-900/40 dark:from-emerald-950/20 dark:via-neutral-900 dark:to-neutral-900">
+                    <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
+                      <Sprout className="h-4 w-4" />
+                      Placement Plan
+                    </div>
+                    <p className="mt-4 text-sm leading-6 text-neutral-700 dark:text-neutral-200">
+                      You can plant <span className="font-bold text-emerald-700 dark:text-emerald-300">{selectedMutation.breakdown.base_limit}x {toMutationLabel(selectedMutation.mutationName)}</span> in one plot.
+                      With {plots} plot{plots > 1 ? "s" : ""}, that becomes <span className="font-bold text-neutral-950 dark:text-white">{selectedMutation.limit} total placements</span>{selectedMutation.breakdown.ingredients.length === 0 ? ", with no setup ingredients required." : "."}
+                    </p>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-2xl border border-white/70 bg-white/80 p-3 dark:border-neutral-800 dark:bg-neutral-900/70">
+                        <p className="text-[11px] uppercase tracking-[0.2em] text-neutral-400">Per Plot</p>
+                        <p className="mt-1 text-lg font-black text-neutral-900 dark:text-white">{selectedMutation.breakdown.base_limit}x</p>
                       </div>
-                      <div className="text-right">
-                        <div className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">{formatCoins(ing.total_cost)} coins</div>
-                        <div className="text-[10px] text-neutral-400 font-mono mt-0.5">{formatCoins(ing.unit_price)} each</div>
+                      <div className="rounded-2xl border border-white/70 bg-white/80 p-3 dark:border-neutral-800 dark:bg-neutral-900/70">
+                        <p className="text-[11px] uppercase tracking-[0.2em] text-neutral-400">Across All Plots</p>
+                        <p className="mt-1 text-lg font-black text-neutral-900 dark:text-white">{selectedMutation.limit}x</p>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
+                  </div>
 
-              <div className="flex justify-between items-center pt-4 border-t border-neutral-200 dark:border-neutral-800">
-                <span className="font-medium">Total Setup Cost</span>
-                <span className="font-mono text-lg font-bold text-amber-500">{formatCoins(selectedMutation.breakdown.total_setup_cost)} coins</span>
-              </div>
-
-              <div className="pt-6">
-                <h4 className="font-bold mb-3 flex items-center justify-between text-emerald-700 dark:text-emerald-400">
-                  <span>Expected Harvest Yields</span>
-                  <span className="text-sm font-normal text-neutral-500 dark:text-neutral-400">~{data ? formatDuration(data.metadata.cycle_time_hours) : "0m"} Cycle</span>
-                </h4>
-
-                <div className="p-5 bg-blue-500/10 rounded-2xl border border-blue-500/20 space-y-4">
-                  {(selectedMutation.mutationName === "Magic Jellybean" || selectedMutation.mutationName === "All-in Aloe") && (
-                    <div className="p-3 bg-blue-500/10 rounded-xl border border-blue-500/20 mb-4">
+                  {selectedMutation.mutationName === "Devourer" && (
+                    <div className="rounded-3xl border border-red-200/80 bg-gradient-to-br from-red-50 via-white to-red-50/50 p-5 shadow-sm dark:border-red-900/40 dark:from-red-950/30 dark:via-neutral-900 dark:to-neutral-900">
                       <div className="flex items-start gap-3">
-                        <AlertTriangle className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
-                        <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed font-medium">
-                          {selectedMutation.mutationName === "Magic Jellybean"
-                            ? "Magic Jellybean is exceptionally rare and has 120 growth stages! It will take significantly longer to reach full maturity than standard crops."
-                            : "For All-in Aloe, the optimal harvest stage is Stage 14 to avoid the maturity reset mechanic."}
-                        </p>
+                        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
+                        <div>
+                          <p className="text-sm font-bold text-red-700 dark:text-red-300">Devourer placement warning</p>
+                          <p className="mt-1 text-sm leading-6 text-red-700/90 dark:text-red-200/90">
+                            This crop destroys surrounding crops over time. Remove adjacent blocks to prevent spread. Growing all 16 at once is possible, but not advised.
+                          </p>
+                        </div>
                       </div>
                     </div>
                   )}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm font-bold text-blue-700 dark:text-blue-400">
-                      <Clock className="w-4 h-4" />
-                      Growth Cycles:
-                    </div>
-                    <span className="bg-blue-600 text-white px-3 py-1 rounded-lg text-xs font-black">
-                      {formatGrowthCyclesDisplay(selectedMutation.hourly?.g ?? selectedMutation.breakdown.growth_stages)}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between pt-2 border-t border-blue-500/20">
-                    <span className="text-xs font-medium text-blue-600 dark:text-blue-400">Estimated Lifecycle Time:</span>
-                    <span className="text-sm font-black text-blue-700 dark:text-blue-300">{formatDuration(selectedMutation.breakdown.estimated_time_hours)}</span>
-                  </div>
-                </div>
 
-                {selectedMutation.breakdown.yields && selectedMutation.breakdown.yields.length > 0 ? (
-                  <div className="space-y-3">
-                    {selectedMutation.breakdown.yields.map((yld) => (
-                      <div key={yld.name} className="flex flex-col p-3 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-100 dark:border-neutral-800">
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center gap-3">
-                            <span className="font-medium">{formatCoins(yld.amount)}x <span className="text-emerald-700 dark:text-emerald-300">{toCropLabel(yld.name)}</span></span>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">{formatCoins(yld.total_value)} coins</div>
-                            <div className="text-[10px] text-neutral-400 font-mono mt-0.5">{formatCoins(yld.unit_price)} each</div>
-                          </div>
-                        </div>
-                        {yld.math && (
-                          <div className="text-[10px] text-neutral-400 font-mono bg-neutral-100 dark:bg-neutral-800 px-2 py-1 rounded w-fit border border-neutral-200 dark:border-neutral-700/50">
-                            Calculation: {formatYieldCalculation(yld.math, yld.unit_price)}
-                          </div>
-                        )}
+                  <div className="rounded-3xl border border-neutral-200/80 bg-neutral-50/80 p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70">
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                      <div>
+                        <h4 className="text-lg font-bold text-neutral-950 dark:text-white">Setup Ingredients</h4>
+                        <p className="text-sm text-neutral-500 dark:text-neutral-400">Everything needed to plant the full batch.</p>
                       </div>
-                    ))}
+                      <span className="rounded-full border border-neutral-200 bg-white px-3 py-1 text-xs font-semibold text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300">
+                        {selectedMutation.breakdown.ingredients.length} item{selectedMutation.breakdown.ingredients.length === 1 ? "" : "s"}
+                      </span>
+                    </div>
+
+                    {selectedMutation.breakdown.ingredients.length > 0 ? (
+                      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+                        {selectedMutation.breakdown.ingredients.map((ing) => (
+                          <div key={ing.name} className="rounded-2xl border border-neutral-200/70 bg-white/85 p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/70">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-400">Ingredient</p>
+                                <p className="mt-2 text-base font-bold text-neutral-900 dark:text-white">
+                                  {ing.amount}x <span className="text-emerald-700 dark:text-emerald-300">{toCropLabel(ing.name)}</span>
+                                </p>
+                              </div>
+                              <div className="rounded-xl border border-amber-200/70 bg-amber-50 px-3 py-2 text-right dark:border-amber-900/40 dark:bg-amber-950/20">
+                                <div className="font-mono text-sm font-black text-amber-600 dark:text-amber-300">{formatCoins(ing.total_cost)}</div>
+                                <div className="mt-0.5 text-[10px] font-mono text-neutral-500 dark:text-neutral-400">{formatCoins(ing.unit_price)} each</div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-emerald-300/70 bg-emerald-50/70 px-4 py-5 text-sm text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
+                        No setup ingredients are needed for this mutation.
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <p className="text-sm text-neutral-500 italic">No direct harvest yields.</p>
-                )}
+                </section>
 
-                <div className="flex justify-between items-center p-6 bg-emerald-500/10 rounded-2xl border border-emerald-500/20">
-                  <span className="font-bold text-emerald-700 dark:text-emerald-400">Total Batch Revenue</span>
-                  <span className="text-2xl font-mono font-black text-emerald-600 dark:text-emerald-400">+{formatCoins(selectedMutation.breakdown.total_revenue)} coins</span>
-                </div>
+                <section className="space-y-4">
+                  <div className="rounded-3xl border border-sky-300/30 bg-[linear-gradient(135deg,rgba(59,130,246,0.12),rgba(16,185,129,0.08)_60%,rgba(255,255,255,0.9))] p-5 shadow-sm dark:border-sky-500/20 dark:bg-[linear-gradient(135deg,rgba(30,64,175,0.3),rgba(6,78,59,0.18)_55%,rgba(10,10,10,0.92))]">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-sky-700 dark:text-sky-300">
+                          <Sparkles className="h-4 w-4" />
+                          Harvest Forecast
+                        </div>
+                        <h4 className="mt-2 text-xl font-black text-neutral-950 dark:text-white">Expected Harvest Yields</h4>
+                      </div>
+                      <span className="rounded-full border border-white/60 bg-white/70 px-3 py-1 text-xs font-semibold text-neutral-600 backdrop-blur dark:border-neutral-700 dark:bg-neutral-900/70 dark:text-neutral-300">
+                        ~{selectedMutationCycleDuration} cycle
+                      </span>
+                    </div>
 
-                <div className="flex justify-between items-center p-6 bg-emerald-500 rounded-2xl shadow-xl shadow-emerald-500/20 text-white">
-                  <span className="font-black uppercase tracking-wider text-sm">Expected Net Profit</span>
-                  <span className="text-2xl font-mono font-black">
-                    {formatCoins(selectedMutation.breakdown.total_revenue - selectedMutation.breakdown.total_setup_cost)} coins
-                  </span>
-                </div>
+                    {(selectedMutation.mutationName === "Magic Jellybean" || selectedMutation.mutationName === "All-in Aloe") && (
+                      <div className="mt-4 rounded-2xl border border-sky-400/20 bg-white/60 p-4 dark:bg-sky-950/20">
+                        <div className="flex items-start gap-3">
+                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-sky-600 dark:text-sky-300" />
+                          <p className="text-sm leading-6 text-sky-800 dark:text-sky-200">
+                            {selectedMutation.mutationName === "Magic Jellybean"
+                              ? "Magic Jellybean is exceptionally rare and has 120 growth stages, so it takes much longer than standard mutations to mature."
+                              : "All-in Aloe should be harvested at Stage 14 to avoid the maturity reset mechanic and preserve the best outcome."}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                      <div className="rounded-2xl border border-white/60 bg-white/70 p-4 backdrop-blur dark:border-neutral-700 dark:bg-neutral-900/70">
+                        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700 dark:text-sky-300">
+                          <Clock className="h-4 w-4" />
+                          Growth
+                        </div>
+                        <div className="mt-2 text-xl font-black text-neutral-950 dark:text-white">{selectedMutationGrowthCycles}</div>
+                        <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">Post-spawn cycles until harvestable.</p>
+                      </div>
+                      <div className="rounded-2xl border border-white/60 bg-white/70 p-4 backdrop-blur dark:border-neutral-700 dark:bg-neutral-900/70">
+                        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700 dark:text-sky-300">
+                          <Clock className="h-4 w-4" />
+                          Lifecycle
+                        </div>
+                        <div className="mt-2 text-xl font-black text-neutral-950 dark:text-white">{formatDuration(selectedMutation.breakdown.estimated_time_hours)}</div>
+                        <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">Estimated time from spawn window to harvest.</p>
+                      </div>
+                      <div className="rounded-2xl border border-white/60 bg-white/70 p-4 backdrop-blur dark:border-neutral-700 dark:bg-neutral-900/70">
+                        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700 dark:text-sky-300">
+                          <Sprout className="h-4 w-4" />
+                          Yield Mix
+                        </div>
+                        <div className="mt-2 text-xl font-black text-neutral-950 dark:text-white">{selectedMutationYieldCount}</div>
+                        <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">Distinct drop lines expected in the harvest.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-3xl border border-neutral-200/80 bg-neutral-50/70 p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70">
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                      <div>
+                        <h4 className="text-lg font-bold text-neutral-950 dark:text-white">Yield Breakdown</h4>
+                        <p className="text-sm text-neutral-500 dark:text-neutral-400">Amounts, value, and the exact formula used for each drop.</p>
+                      </div>
+                    </div>
+
+                    {selectedMutation.breakdown.yields && selectedMutation.breakdown.yields.length > 0 ? (
+                      <div className="space-y-3">
+                        {selectedMutation.breakdown.yields.map((yld) => (
+                          <div key={yld.name} className="rounded-2xl border border-neutral-200/70 bg-gradient-to-br from-white via-white to-neutral-50 p-4 shadow-sm dark:border-neutral-800 dark:from-neutral-950 dark:via-neutral-950 dark:to-neutral-900">
+                            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-400">
+                                  <Sparkles className="h-3.5 w-3.5" />
+                                  Expected yield
+                                </div>
+                                <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                                  <span className="text-2xl font-black tracking-tight text-neutral-950 dark:text-white">{formatCoins(yld.amount)}x</span>
+                                  <span className="text-xl font-semibold text-emerald-700 dark:text-emerald-300">{toCropLabel(yld.name)}</span>
+                                </div>
+                                {yld.math && (
+                                  <div className="mt-4 rounded-2xl border border-neutral-200/80 bg-neutral-950 px-3 py-2 text-[11px] font-mono leading-5 text-neutral-200 shadow-inner dark:border-neutral-700">
+                                    <span className="font-semibold text-emerald-300">Calculation:</span> {formatYieldCalculation(yld.math, yld.unit_price)}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="shrink-0 rounded-2xl border border-emerald-300/20 bg-emerald-500/10 px-4 py-3 text-right dark:border-emerald-500/20 dark:bg-emerald-500/10">
+                                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">Value</div>
+                                <div className="mt-1 text-2xl font-black font-mono text-emerald-600 dark:text-emerald-300">{formatCoins(yld.total_value)}</div>
+                                <div className="mt-0.5 text-[11px] font-mono text-neutral-500 dark:text-neutral-400">{formatCoins(yld.unit_price)} each</div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-neutral-300 bg-white/80 px-4 py-6 text-sm italic text-neutral-500 dark:border-neutral-700 dark:bg-neutral-950/70 dark:text-neutral-400">
+                        No direct harvest yields.
+                      </div>
+                    )}
+
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-2xl border border-emerald-300/20 bg-emerald-500/10 p-4">
+                        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
+                          <Coins className="h-4 w-4" />
+                          Total Batch Revenue
+                        </div>
+                        <div className="mt-2 text-3xl font-black font-mono text-emerald-600 dark:text-emerald-300">
+                          +{formatCoins(selectedMutation.breakdown.total_revenue)}
+                        </div>
+                      </div>
+                      <div className={`rounded-2xl p-4 shadow-lg ${selectedMutationNetProfit >= 0
+                        ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-emerald-500/20"
+                        : "bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-red-500/20"
+                        }`}>
+                        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/80">
+                          <ArrowUpRight className="h-4 w-4" />
+                          Expected Net Profit
+                        </div>
+                        <div className="mt-2 text-3xl font-black font-mono">
+                          {formatSignedCoins(selectedMutationNetProfit)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </section>
               </div>
             </div>
           </div>

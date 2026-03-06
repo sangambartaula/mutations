@@ -158,23 +158,6 @@ def has_wide_spread(price_a: float, price_b: float) -> bool:
     return (hi / lo) >= SPREAD_WARNING_RATIO
 
 
-def compute_break_even_cycles(setup_cost: float, avg_value_per_cycle: float) -> float | None:
-    if not math.isfinite(setup_cost) or setup_cost < 0:
-        return None
-    if not math.isfinite(avg_value_per_cycle) or avg_value_per_cycle <= 0:
-        return None
-    result = setup_cost / avg_value_per_cycle
-    if not math.isfinite(result):
-        return None
-    return float(result)
-
-
-def format_break_even_cycles(value: float | None) -> str:
-    if value is None or not math.isfinite(value) or value <= 0:
-        return "Never"
-    # Use ceil so displayed cycles are conservative whole ticks.
-    return str(int(math.ceil(value)))
-
 @app.get("/api/ping")
 def ping():
     return {"status": "ok"}
@@ -437,10 +420,7 @@ def get_leaderboard(
                 "v_net": None,
                 "warnings": [f"profit model error: {exc}"],
             }
-        profit_per_cycle = finite_or_zero(profit_models.get("profit_per_cycle"))
         profit_per_hour = finite_or_zero(profit_models.get("profit_per_hour"))
-        break_even_cycles = compute_break_even_cycles(float(opt_cost), profit_per_cycle)
-        break_even_cycles_display = format_break_even_cycles(break_even_cycles)
         hourly_profit_selected = finite_or_none(profit_models.get("profit_per_hour"))
 
         payback_hours_ready = (opt_cost / hourly_profit_selected) if (hourly_profit_selected is not None and hourly_profit_selected > 0) else None
@@ -476,10 +456,7 @@ def get_leaderboard(
             "mutationName": mut_name,
             "score": score,
             "profit": profit_batch,
-            "profit_per_cycle": profit_per_cycle,
             "profit_per_hour": profit_per_hour,
-            "break_even_cycles": break_even_cycles,
-            "break_even_cycles_display": break_even_cycles_display,
             "opt_cost": opt_cost,
             "revenue": total_cycle_revenue,
             "warning": mut_warning or ing_warning,
@@ -497,10 +474,7 @@ def get_leaderboard(
                 "hours_per_harvest_per_spot": profit_models.get("hours_per_harvest_per_spot"),
                 "harvests_per_cycle": profit_models.get("harvests_per_cycle"),
                 "harvests_per_hour": profit_models.get("harvests_per_hour"),
-                "profit_per_cycle": profit_models.get("profit_per_cycle"),
                 "profit_per_hour": profit_models.get("profit_per_hour"),
-                "break_even_cycles": break_even_cycles,
-                "break_even_cycles_display": break_even_cycles_display,
                 "warnings": profit_models.get("warnings", []),
                 "payback_hours_ready": payback_hours_ready,
                 # Legacy fields retained for backward compatibility:
