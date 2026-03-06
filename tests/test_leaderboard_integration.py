@@ -1,7 +1,7 @@
 import math
 from unittest.mock import patch
 
-from api.index import get_leaderboard
+from api.index import DEFAULT_METRIC_SPAWN_CHANCE, get_leaderboard
 
 
 @patch("api.index.get_bazaar_prices", return_value={"Magic Jellybean": {"buyPrice": 1000, "sellPrice": 900}})
@@ -34,7 +34,8 @@ def test_leaderboard_exposes_profit_models_and_no_nan(_mock_prices):
     assert pm is not None
     assert "profit_per_growth_cycle" in sample
     assert math.isfinite(sample["profit_per_growth_cycle"])
-    assert sample["profit_per_growth_cycle"] == sample["profit"] / sample["breakdown"]["growth_stages"]
+    expected_cycles = (1.0 / DEFAULT_METRIC_SPAWN_CHANCE) + sample["breakdown"]["growth_stages"]
+    assert sample["profit_per_growth_cycle"] == sample["profit"] / expected_cycles
     assert "warning_messages" in sample
     assert "profit_per_cycle" not in sample
     assert "break_even_cycles" not in sample
@@ -48,6 +49,9 @@ def test_leaderboard_exposes_profit_models_and_no_nan(_mock_prices):
         "p",
         "g",
         "N",
+        "expected_spawn_cycles",
+        "expected_cycles",
+        "expected_hours",
         "cycles_per_harvest_per_spot",
         "hours_per_harvest_per_spot",
         "harvests_per_cycle",
@@ -63,6 +67,9 @@ def test_leaderboard_exposes_profit_models_and_no_nan(_mock_prices):
         "p",
         "g",
         "N",
+        "expected_spawn_cycles",
+        "expected_cycles",
+        "expected_hours",
         "cycles_per_harvest_per_spot",
         "hours_per_harvest_per_spot",
         "harvests_per_cycle",

@@ -2,11 +2,10 @@ import unittest
 from unittest.mock import patch
 
 from api.index import (
-    DEFAULT_SPECIAL_MULTIPLIER_BY_MUTATION,
-    MANUAL_DATA,
+    DEFAULT_METRIC_SPAWN_CHANCE,
+    LONELILY_METRIC_SPAWN_CHANCE,
     get_leaderboard,
 )
-from mut_calc import compute_profit_rates
 
 
 class LeaderboardTests(unittest.TestCase):
@@ -266,7 +265,7 @@ class LeaderboardTests(unittest.TestCase):
         self.assertAlmostEqual(veil["breakdown"]["estimated_time_hours"], result["metadata"]["cycle_time_hours"], places=6)
 
     @patch("api.index.get_bazaar_prices", return_value={})
-    def test_profit_per_hour_uses_renewal_model_output(self, _mock_prices):
+    def test_profit_per_hour_matches_expected_cycle_model(self, _mock_prices):
         result = get_leaderboard(
             plots=3,
             fortune=2500,
@@ -280,9 +279,10 @@ class LeaderboardTests(unittest.TestCase):
         )
 
         for mutation in result["leaderboard"]:
-            model_hour = mutation["hourly"]["profit_per_hour"]
-
-            self.assertAlmostEqual(mutation["profit_per_hour"], model_hour, places=6)
+            expected_hours = mutation["hourly"]["expected_hours"]
+            self.assertIsNotNone(expected_hours)
+            self.assertAlmostEqual(mutation["profit_per_hour"], mutation["profit"] / expected_hours, places=6)
+            self.assertAlmostEqual(mutation["profit_per_hour"], mutation["hourly"]["profit_per_hour"], places=6)
 
     @patch("api.index.get_bazaar_prices", return_value={})
     def test_public_leaderboard_exposes_growth_cycle_metric_and_omits_removed_cycle_metrics(self, _mock_prices):
@@ -300,14 +300,14 @@ class LeaderboardTests(unittest.TestCase):
 
         for mutation in result["leaderboard"]:
             growth_stages = mutation["breakdown"]["growth_stages"]
-            if growth_stages > 0:
-                self.assertAlmostEqual(
-                    mutation["profit_per_growth_cycle"],
-                    mutation["profit"] / growth_stages,
-                    places=6,
-                )
-            else:
-                self.assertIsNone(mutation["profit_per_growth_cycle"])
+            spawn_chance = LONELILY_METRIC_SPAWN_CHANCE if mutation["mutationName"] == "Lonelily" else DEFAULT_METRIC_SPAWN_CHANCE
+            expected_cycles = (1.0 / spawn_chance) + growth_stages
+            self.assertAlmostEqual(
+                mutation["profit_per_growth_cycle"],
+                mutation["profit"] / expected_cycles,
+                places=6,
+            )
+            self.assertAlmostEqual(mutation["hourly"]["expected_cycles"], expected_cycles, places=6)
             self.assertIn("warning_messages", mutation)
             self.assertNotIn("profit_per_cycle", mutation)
             self.assertNotIn("break_even_cycles", mutation)
@@ -335,14 +335,13 @@ class LeaderboardTests(unittest.TestCase):
             for mutation in result["leaderboard"]
         }
         self.assertTrue(any("Devourer can spread" in msg for msg in messages_by_name["Devourer"]))
-        self.assertTrue(any("Magic Jellybean takes much longer" in msg for msg in messages_by_name["Magic Jellybean"]))
+        self.assertTrue(any("120 growth stages" in msg for msg in messages_by_name["Magic Jellybean"]))
         self.assertTrue(any("raw multiplier there is 60x" in msg for msg in messages_by_name["All-in Aloe"]))
 
     @patch("api.index.get_bazaar_prices", return_value={"Magic Jellybean": {"buyPrice": 1000, "sellPrice": 900}})
-    def test_profit_per_hour_includes_harvest_multiplier_in_v_net(self, _mock_prices):
-        plots = 1
+    def test_profit_per_hour_uses_profit_per_harvest_divided_by_expected_hours(self, _mock_prices):
         result = get_leaderboard(
-            plots=plots,
+            plots=1,
             fortune=2500,
             gh_upgrade=9,
             unique_crops=12,
@@ -358,35 +357,13 @@ class LeaderboardTests(unittest.TestCase):
         jellybean = next((m for m in result["leaderboard"] if m["mutationName"] == "Magic Jellybean"), None)
         self.assertIsNotNone(jellybean)
 
-        jelly_data = MANUAL_DATA["Magic Jellybean"]
-        special = float(
-            jelly_data.get(
-                "effective_special_multiplier",
-                jelly_data.get(
-                    "special_multiplier",
-                    DEFAULT_SPECIAL_MULTIPLIER_BY_MUTATION.get("Magic Jellybean", 1.0),
-                ),
-            )
-        )
-
-        cycle_time_hours = result["metadata"]["cycle_time_hours"]
-        expected = compute_profit_rates({
-            "m": plots,
-            "x": jellybean["breakdown"]["base_limit"],
-            "p": jellybean["hourly"]["p"],
-            "tau": cycle_time_hours,
-            "g": jellybean["breakdown"]["growth_stages"],
-            "v": jellybean["mut_price"] * special,
-            "per_harvest_cost": 50.0,
-        })
-
-        self.assertAlmostEqual(jellybean["profit_per_hour"], expected["profit_per_hour"], places=6)
+        expected_hours = ((1.0 / DEFAULT_METRIC_SPAWN_CHANCE) + jellybean["breakdown"]["growth_stages"]) * result["metadata"]["cycle_time_hours"]
+        self.assertAlmostEqual(jellybean["profit_per_hour"], jellybean["profit"] / expected_hours, places=6)
 
     @patch("api.index.get_bazaar_prices", return_value={"All-in Aloe": {"buyPrice": 1_250_000, "sellPrice": 1_000_000}})
-    def test_all_in_aloe_profit_per_hour_uses_effective_special_multiplier(self, _mock_prices):
-        plots = 1
+    def test_all_in_aloe_profit_metrics_use_expected_cycle_model(self, _mock_prices):
         result = get_leaderboard(
-            plots=plots,
+            plots=1,
             fortune=2500,
             gh_upgrade=9,
             unique_crops=12,
@@ -401,37 +378,10 @@ class LeaderboardTests(unittest.TestCase):
         aloe = next((m for m in result["leaderboard"] if m["mutationName"] == "All-in Aloe"), None)
         self.assertIsNotNone(aloe)
 
-        aloe_data = MANUAL_DATA["All-in Aloe"]
-        special = float(
-            aloe_data.get(
-                "effective_special_multiplier",
-                aloe_data.get(
-                    "special_multiplier",
-                    DEFAULT_SPECIAL_MULTIPLIER_BY_MUTATION.get("All-in Aloe", 1.0),
-                ),
-            )
-        )
-
-        cycle_time_hours = result["metadata"]["cycle_time_hours"]
-        base_inputs = {
-            "m": plots,
-            "x": aloe["breakdown"]["base_limit"],
-            "p": aloe["hourly"]["p"],
-            "tau": cycle_time_hours,
-            "g": aloe["breakdown"]["growth_stages"],
-            "per_harvest_cost": 0.0,
-        }
-        expected_with_special = compute_profit_rates({
-            **base_inputs,
-            "v": aloe["mut_price"] * special,
-        })
-        expected_without_special = compute_profit_rates({
-            **base_inputs,
-            "v": aloe["mut_price"],
-        })
-
-        self.assertAlmostEqual(aloe["profit_per_hour"], expected_with_special["profit_per_hour"], places=6)
-        self.assertNotAlmostEqual(aloe["profit_per_hour"], expected_without_special["profit_per_hour"], places=6)
+        expected_cycles = (1.0 / DEFAULT_METRIC_SPAWN_CHANCE) + aloe["breakdown"]["growth_stages"]
+        expected_hours = expected_cycles * result["metadata"]["cycle_time_hours"]
+        self.assertAlmostEqual(aloe["profit_per_growth_cycle"], aloe["profit"] / expected_cycles, places=6)
+        self.assertAlmostEqual(aloe["profit_per_hour"], aloe["profit"] / expected_hours, places=6)
 
     @patch("api.index.get_bazaar_prices", return_value={})
     def test_lonelily_override_affects_profit_mode_mutation_count(self, _mock_prices):
@@ -456,7 +406,9 @@ class LeaderboardTests(unittest.TestCase):
         self.assertIsNotNone(lonelily_yield)
         # 25 per plot * 3 plots * 0.02 chance over 1 cycle
         self.assertAlmostEqual(lonelily_yield["amount"], 1.5, places=6)
-        self.assertAlmostEqual(lonelily["profit_per_growth_cycle"], lonelily["profit"], places=6)
+        expected_cycles = (1.0 / LONELILY_METRIC_SPAWN_CHANCE) + lonelily["breakdown"]["growth_stages"]
+        self.assertAlmostEqual(lonelily["hourly"]["p"], LONELILY_METRIC_SPAWN_CHANCE, places=9)
+        self.assertAlmostEqual(lonelily["profit_per_growth_cycle"], lonelily["profit"] / expected_cycles, places=6)
 
     @patch("api.index.get_bazaar_prices", return_value={})
     def test_merged_mushroom_yield_sums_base_drop_for_formula_display(self, _mock_prices):
@@ -502,7 +454,7 @@ class LeaderboardTests(unittest.TestCase):
         self.assertEqual(sunflower["math"]["special"], 9.37)
 
     @patch("api.index.get_bazaar_prices", return_value={"Lonelily": {"buyPrice": 100, "sellPrice": 90}})
-    def test_hourly_mode_uses_renewal_model_formula(self, _mock_prices):
+    def test_hourly_mode_uses_expected_cycle_formula(self, _mock_prices):
         plots = 2
         result = get_leaderboard(
             plots=plots,
@@ -521,18 +473,10 @@ class LeaderboardTests(unittest.TestCase):
         lonelily = next((m for m in result["leaderboard"] if m["mutationName"] == "Lonelily"), None)
         self.assertIsNotNone(lonelily)
 
-        cycle_time_hours = result["metadata"]["cycle_time_hours"]
-        expected = compute_profit_rates({
-            "m": plots,
-            "x": lonelily["breakdown"]["base_limit"],
-            "p": lonelily["hourly"]["p"],
-            "tau": cycle_time_hours,
-            "g": lonelily["breakdown"]["growth_stages"],
-            "v": lonelily["mut_price"],
-            "per_harvest_cost": 5.0,
-        })
-
-        self.assertAlmostEqual(lonelily["hourly"]["profit_per_hour_selected"], expected["profit_per_hour"], places=6)
+        expected_cycles = (1.0 / LONELILY_METRIC_SPAWN_CHANCE) + lonelily["breakdown"]["growth_stages"]
+        expected_hours = expected_cycles * result["metadata"]["cycle_time_hours"]
+        self.assertAlmostEqual(lonelily["hourly"]["expected_cycles"], expected_cycles, places=6)
+        self.assertAlmostEqual(lonelily["hourly"]["profit_per_hour_selected"], lonelily["profit"] / expected_hours, places=6)
 
 
 if __name__ == "__main__":

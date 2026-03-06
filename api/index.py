@@ -12,8 +12,6 @@ from fastapi import FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from mut_calc import compute_profit_rates
-
 try:
     from api.shared_data import NPC_PRICES, get_bazaar_prices, csv_data, DEFAULT_REQS
 except ImportError:
@@ -148,6 +146,8 @@ DEFAULT_SPECIAL_MULTIPLIER_BY_MUTATION = {
 }
 
 SPREAD_WARNING_RATIO = 2.0  # 100% difference => 2x between two prices.
+DEFAULT_METRIC_SPAWN_CHANCE = 0.25
+LONELILY_METRIC_SPAWN_CHANCE = 0.0045
 CHIP_LEVEL_CAP_BY_RARITY: Dict[str, int] = {
     "rare": 10,
     "epic": 15,
@@ -201,15 +201,75 @@ def has_wide_spread(price_a: float, price_b: float) -> bool:
     return (hi / lo) >= SPREAD_WARNING_RATIO
 
 
-def compute_profit_per_growth_cycle(profit_per_harvest: float, growth_stages: int) -> float | None:
-    if growth_stages <= 0:
-        return None
+def metric_spawn_chance_for_mutation(mutation_name: str) -> float:
+    if mutation_name == "Lonelily":
+        return LONELILY_METRIC_SPAWN_CHANCE
+    return DEFAULT_METRIC_SPAWN_CHANCE
+
+
+def build_expected_cycle_profit_model(
+    *,
+    profit_per_harvest: float,
+    spawn_chance: float,
+    growth_stages: int,
+    cycle_time_hours: float,
+    batch_size: int,
+) -> Dict[str, Any]:
+    warnings: List[str] = []
+
     if not math.isfinite(profit_per_harvest):
-        return None
-    result = profit_per_harvest / float(growth_stages)
-    if not math.isfinite(result):
-        return None
-    return float(result)
+        profit_per_harvest = 0.0
+        warnings.append("Non-finite profit detected; expected-cycle profit metrics were reset to 0.")
+
+    if not math.isfinite(spawn_chance) or spawn_chance <= 0.0:
+        warnings.append("Non-positive spawn chance; expected-cycle metrics were reset to 0.")
+        return {
+            "tau_hours": max(0.0, cycle_time_hours if math.isfinite(cycle_time_hours) else 0.0),
+            "p": 0.0,
+            "g": float(growth_stages),
+            "N": float(max(0, batch_size)),
+            "expected_spawn_cycles": None,
+            "expected_cycles": None,
+            "expected_hours": None,
+            "cycles_per_harvest_per_spot": None,
+            "hours_per_harvest_per_spot": None,
+            "harvests_per_cycle": None,
+            "harvests_per_hour": None,
+            "profit_per_cycle": None,
+            "profit_per_hour": None,
+            "v_net": profit_per_harvest,
+            "warnings": warnings,
+        }
+
+    safe_cycle_time = cycle_time_hours if math.isfinite(cycle_time_hours) and cycle_time_hours > 0 else 0.0
+    if safe_cycle_time == 0.0:
+        warnings.append("Non-positive cycle time; hourly metrics were reset to 0.")
+
+    expected_spawn_cycles = 1.0 / spawn_chance
+    expected_cycles = expected_spawn_cycles + float(max(0, growth_stages))
+    expected_hours = expected_cycles * safe_cycle_time if safe_cycle_time > 0.0 else None
+    harvests_per_cycle = (1.0 / expected_cycles) if expected_cycles > 0.0 else None
+    harvests_per_hour = (1.0 / expected_hours) if expected_hours and expected_hours > 0.0 else None
+    profit_per_cycle = (profit_per_harvest / expected_cycles) if expected_cycles > 0.0 else None
+    profit_per_hour = (profit_per_harvest / expected_hours) if expected_hours and expected_hours > 0.0 else None
+
+    return {
+        "tau_hours": safe_cycle_time,
+        "p": float(spawn_chance),
+        "g": float(growth_stages),
+        "N": float(max(0, batch_size)),
+        "expected_spawn_cycles": expected_spawn_cycles,
+        "expected_cycles": expected_cycles,
+        "expected_hours": expected_hours,
+        "cycles_per_harvest_per_spot": expected_cycles,
+        "hours_per_harvest_per_spot": expected_hours,
+        "harvests_per_cycle": harvests_per_cycle,
+        "harvests_per_hour": harvests_per_hour,
+        "profit_per_cycle": profit_per_cycle,
+        "profit_per_hour": profit_per_hour,
+        "v_net": profit_per_harvest,
+        "warnings": warnings,
+    }
 
 
 def build_warning_messages(mutation_name: str, market_warning: bool) -> List[str]:
@@ -219,7 +279,7 @@ def build_warning_messages(mutation_name: str, market_warning: bool) -> List[str
     if mutation_name == "Devourer":
         messages.append("Devourer can spread into nearby crops and destroy them if you do not isolate it.")
     if mutation_name == "Magic Jellybean":
-        messages.append("Magic Jellybean takes much longer to mature than most mutations, so real runs can vary more over time.")
+        messages.append("Magic Jellybean has 120 growth stages and is best harvested fully grown so spawn wait is not wasted.")
     if mutation_name == "All-in Aloe":
         messages.append("All-in Aloe is evaluated at Stage 14. Its raw multiplier there is 60x, but the calculator uses the reset-adjusted expected multiplier of 9.37x.")
     return messages
@@ -490,37 +550,15 @@ def get_leaderboard(
         # 3. Profit metrics
         profit_batch = total_cycle_revenue - opt_cost
 
-        # Growth-stage mapping from product requirements:
-        # growth_stages is cycles AFTER spawn until harvestable, so g = growth_stages exactly.
-        try:
-            # Include harvest-time multiplier in v so renewal model v_net captures conditional bonuses.
-            harvest_value_with_multiplier = mut_sell_price_value * effective_special_mult
-            profit_models = compute_profit_rates({
-                "m": plots,
-                "x": int(base_limit),
-                "p": mutation_chance_effective,
-                "tau": cycle_time_hours,
-                "g": growth_stages,
-                "v": harvest_value_with_multiplier,
-                "per_harvest_cost": per_harvest_cost,
-            })
-        except ValueError as exc:
-            # Keep API resilient per mutation and surface validation context in warnings.
-            profit_models = {
-                "tau_hours": cycle_time_hours,
-                "p": mutation_chance_effective,
-                "g": float(growth_stages),
-                "N": None,
-                "cycles_per_harvest_per_spot": None,
-                "hours_per_harvest_per_spot": None,
-                "harvests_per_cycle": None,
-                "harvests_per_hour": None,
-                "profit_per_cycle": None,
-                "profit_per_hour": None,
-                "v_net": None,
-                "warnings": [f"profit model error: {exc}"],
-            }
-        profit_per_growth_cycle = compute_profit_per_growth_cycle(profit_batch, growth_stages)
+        metric_spawn_chance = metric_spawn_chance_for_mutation(mut_name)
+        profit_models = build_expected_cycle_profit_model(
+            profit_per_harvest=profit_batch,
+            spawn_chance=metric_spawn_chance,
+            growth_stages=growth_stages,
+            cycle_time_hours=cycle_time_hours,
+            batch_size=limit,
+        )
+        profit_per_growth_cycle = finite_or_none(profit_models.get("profit_per_cycle"))
         profit_per_hour = finite_or_zero(profit_models.get("profit_per_hour"))
         hourly_profit_selected = finite_or_none(profit_models.get("profit_per_hour"))
         warning_messages = build_warning_messages(mut_name, mut_warning or ing_warning)
@@ -532,10 +570,7 @@ def get_leaderboard(
         if mode == "profit":
             score = profit_batch
         elif mode == "target" and target_crop:
-            if target_crop == "Mushroom":
-                score = (float(cleaned_row.get("Red Mushroom ", 0)) + float(cleaned_row.get("Brown Mushroom", 0))) * effective_limit * calc_mult * effective_special_mult
-            else:
-                score = float(cleaned_row.get(target_crop, 0)) * effective_limit * calc_mult * effective_special_mult
+            score = next((item["amount"] for item in yields if item["name"] == target_crop), 0.0)
             
         elif mode == "smart":
             score = sum(smart_progress.values())
@@ -568,12 +603,15 @@ def get_leaderboard(
             "limit": limit,
             "smart_progress": smart_progress,
             "hourly": {
-                "mutation_chance": mutation_chance_effective,
+                "mutation_chance": metric_spawn_chance,
                 "profit_per_hour_selected": hourly_profit_selected,
                 "tau_hours": profit_models.get("tau_hours"),
                 "p": profit_models.get("p"),
                 "g": profit_models.get("g"),
                 "N": profit_models.get("N"),
+                "expected_spawn_cycles": profit_models.get("expected_spawn_cycles"),
+                "expected_cycles": profit_models.get("expected_cycles"),
+                "expected_hours": profit_models.get("expected_hours"),
                 "cycles_per_harvest_per_spot": profit_models.get("cycles_per_harvest_per_spot"),
                 "hours_per_harvest_per_spot": profit_models.get("hours_per_harvest_per_spot"),
                 "harvests_per_cycle": profit_models.get("harvests_per_cycle"),
