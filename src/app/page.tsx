@@ -10,6 +10,7 @@ type SetupMode = "buy_order" | "insta_buy";
 type SellMode = "sell_offer" | "insta_sell";
 type SortKey = "rank" | "mutation" | "value" | "growth_cycle_profit" | "cycles" | "setup";
 type SortDirection = "asc" | "desc";
+type ChipRarity = "rare" | "epic" | "legendary";
 
 type YieldMath = {
   base: number;
@@ -19,6 +20,7 @@ type YieldMath = {
   unique_buff: number;
   wart_buff: number;
   fortune: number;
+  overdrive_bonus?: number;
   special: number;
 };
 
@@ -89,17 +91,23 @@ type LeaderboardResponse = {
       infini_vacuum: boolean;
       dark_cacao: boolean;
       hypercharge_level: number;
+      hypercharge_rarity: ChipRarity;
       affected_multiplier: number;
     };
     yield_breakdown?: {
       base_multiplier: number;
       evergreen_chip_level: number;
+      evergreen_chip_rarity: ChipRarity;
       evergreen_bonus: number;
       greenhouse_yield_upgrade: number;
       greenhouse_yield_bonus: number;
       unique_crops: number;
       unique_crop_bonus: number;
       wart_multiplier: number;
+      overdrive_chip_level: number;
+      overdrive_chip_rarity: ChipRarity;
+      overdrive_crop?: string | null;
+      overdrive_bonus: number;
     };
     speed_breakdown?: {
       greenhouse_speed_upgrade: number;
@@ -114,6 +122,16 @@ const optimizationModes: { id: OptimizationMode; label: string }[] = [
   { id: "smart", label: "Smart (Milestones)" },
   { id: "target", label: "Focus One Crop" },
 ];
+const chipRarityOrder: ChipRarity[] = ["rare", "epic", "legendary"];
+const chipRarityConfig: Record<ChipRarity, { label: string; maxLevel: number; hyperchargeRate: number; evergreenRate: number; overdriveBonus: number }> = {
+  rare: { label: "Rare", maxLevel: 10, hyperchargeRate: 0.03, evergreenRate: 0.02, overdriveBonus: 5 },
+  epic: { label: "Epic", maxLevel: 15, hyperchargeRate: 0.04, evergreenRate: 0.025, overdriveBonus: 6 },
+  legendary: { label: "Legendary", maxLevel: 20, hyperchargeRate: 0.05, evergreenRate: 0.03, overdriveBonus: 7 },
+};
+const asChipRarity = (value: unknown, fallback: ChipRarity = "legendary"): ChipRarity =>
+  value === "rare" || value === "epic" || value === "legendary" ? value : fallback;
+const clampChipLevelByRarity = (value: number, rarity: ChipRarity) =>
+  Math.max(0, Math.min(chipRarityConfig[rarity].maxLevel, value));
 
 const cropLabelMap: Record<string, string> = {
   "Coco Bean": "Cocoa Beans",
@@ -168,10 +186,15 @@ export default function Home() {
   const [useInfiniVacuum, setUseInfiniVacuum] = useState(false);
   const [useDarkCacao, setUseDarkCacao] = useState(false);
   const [hyperchargeLevel, setHyperchargeLevel] = useState(0);
+  const [hyperchargeRarity, setHyperchargeRarity] = useState<ChipRarity>("legendary");
   const [ghYieldUpgrade, setGhYieldUpgrade] = useState(9);
   const [ghSpeedUpgrade, setGhSpeedUpgrade] = useState(9);
   const [uniqueCrops, setUniqueCrops] = useState(12);
   const [evergreenChipLevel, setEvergreenChipLevel] = useState(20);
+  const [evergreenChipRarity, setEvergreenChipRarity] = useState<ChipRarity>("legendary");
+  const [overdriveChipLevel, setOverdriveChipLevel] = useState(0);
+  const [overdriveChipRarity, setOverdriveChipRarity] = useState<ChipRarity>("legendary");
+  const [overdriveCrop, setOverdriveCrop] = useState("");
 
   const [mode, setMode] = useState<OptimizationMode>("profit");
   const [targetCrop, setTargetCrop] = useState("Wheat");
@@ -243,7 +266,11 @@ export default function Home() {
         if (typeof parsed.useHarvestHarbinger === "boolean") setUseHarvestHarbinger(parsed.useHarvestHarbinger);
         if (typeof parsed.useInfiniVacuum === "boolean") setUseInfiniVacuum(parsed.useInfiniVacuum);
         if (typeof parsed.useDarkCacao === "boolean") setUseDarkCacao(parsed.useDarkCacao);
-        if (typeof parsed.hyperchargeLevel === "number") setHyperchargeLevel(Math.max(0, Math.min(20, parsed.hyperchargeLevel)));
+        const parsedHyperchargeRarity = asChipRarity(parsed.hyperchargeRarity);
+        setHyperchargeRarity(parsedHyperchargeRarity);
+        if (typeof parsed.hyperchargeLevel === "number") {
+          setHyperchargeLevel(clampChipLevelByRarity(parsed.hyperchargeLevel, parsedHyperchargeRarity));
+        }
         const legacyGhUpgrade = typeof parsed.ghUpgrade === "number"
           ? Math.max(0, Math.min(9, parsed.ghUpgrade))
           : 9;
@@ -252,7 +279,17 @@ export default function Home() {
         if (typeof parsed.ghSpeedUpgrade === "number") setGhSpeedUpgrade(Math.max(0, Math.min(9, parsed.ghSpeedUpgrade)));
         else setGhSpeedUpgrade(legacyGhUpgrade);
         if (typeof parsed.uniqueCrops === "number") setUniqueCrops(Math.max(0, Math.min(12, parsed.uniqueCrops)));
-        if (typeof parsed.evergreenChipLevel === "number") setEvergreenChipLevel(Math.max(0, Math.min(20, parsed.evergreenChipLevel)));
+        const parsedEvergreenRarity = asChipRarity(parsed.evergreenChipRarity);
+        setEvergreenChipRarity(parsedEvergreenRarity);
+        if (typeof parsed.evergreenChipLevel === "number") {
+          setEvergreenChipLevel(clampChipLevelByRarity(parsed.evergreenChipLevel, parsedEvergreenRarity));
+        }
+        const parsedOverdriveRarity = asChipRarity(parsed.overdriveChipRarity);
+        setOverdriveChipRarity(parsedOverdriveRarity);
+        if (typeof parsed.overdriveChipLevel === "number") {
+          setOverdriveChipLevel(clampChipLevelByRarity(parsed.overdriveChipLevel, parsedOverdriveRarity));
+        }
+        if (typeof parsed.overdriveCrop === "string") setOverdriveCrop(parsed.overdriveCrop);
         if (parsed.setupMode === "buy_order" || parsed.setupMode === "insta_buy") setSetupMode(parsed.setupMode);
         if (parsed.sellMode === "sell_offer" || parsed.sellMode === "insta_sell") setSellMode(parsed.sellMode);
       }
@@ -271,10 +308,15 @@ export default function Home() {
         useInfiniVacuum,
         useDarkCacao,
         hyperchargeLevel,
+        hyperchargeRarity,
         ghYieldUpgrade,
         ghSpeedUpgrade,
         uniqueCrops,
         evergreenChipLevel,
+        evergreenChipRarity,
+        overdriveChipLevel,
+        overdriveChipRarity,
+        overdriveCrop,
         setupMode,
         sellMode,
       }));
@@ -289,13 +331,30 @@ export default function Home() {
     useInfiniVacuum,
     useDarkCacao,
     hyperchargeLevel,
+    hyperchargeRarity,
     ghYieldUpgrade,
     ghSpeedUpgrade,
     uniqueCrops,
     evergreenChipLevel,
+    evergreenChipRarity,
+    overdriveChipLevel,
+    overdriveChipRarity,
+    overdriveCrop,
     setupMode,
     sellMode,
   ]);
+
+  useEffect(() => {
+    setHyperchargeLevel((current) => clampChipLevelByRarity(current, hyperchargeRarity));
+  }, [hyperchargeRarity]);
+
+  useEffect(() => {
+    setEvergreenChipLevel((current) => clampChipLevelByRarity(current, evergreenChipRarity));
+  }, [evergreenChipRarity]);
+
+  useEffect(() => {
+    setOverdriveChipLevel((current) => clampChipLevelByRarity(current, overdriveChipRarity));
+  }, [overdriveChipRarity]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -311,14 +370,19 @@ export default function Home() {
       infini_vacuum: useInfiniVacuum ? "true" : "false",
       dark_cacao: useDarkCacao ? "true" : "false",
       hypercharge_level: hyperchargeLevel.toString(),
+      hypercharge_rarity: hyperchargeRarity,
       gh_yield_upgrade: ghYieldUpgrade.toString(),
       gh_speed_upgrade: ghSpeedUpgrade.toString(),
       unique_crops: uniqueCrops.toString(),
       evergreen_chip_level: evergreenChipLevel.toString(),
+      evergreen_chip_rarity: evergreenChipRarity,
+      overdrive_chip_level: overdriveChipLevel.toString(),
+      overdrive_chip_rarity: overdriveChipRarity,
       mode: mode,
       setup_mode: setupMode,
       sell_mode: sellMode,
       maxed_crops: maxedCropsQuery,
+      ...(overdriveCrop && { overdrive_crop: overdriveCrop }),
       ...(mode === "target" && { target_crop: targetCrop })
     });
     const queryString = query.toString();
@@ -363,10 +427,15 @@ export default function Home() {
     useInfiniVacuum,
     useDarkCacao,
     hyperchargeLevel,
+    hyperchargeRarity,
     ghYieldUpgrade,
     ghSpeedUpgrade,
     uniqueCrops,
     evergreenChipLevel,
+    evergreenChipRarity,
+    overdriveChipLevel,
+    overdriveChipRarity,
+    overdriveCrop,
     mode,
     setupMode,
     sellMode,
@@ -479,6 +548,9 @@ export default function Home() {
         steps.push({ label: "Unique Crops", value: `+${formatPreciseValue(math.unique_buff)}`, tone: "unique" });
       }
       steps.push({ label: "Wart Boost", value: formatPreciseValue(math.wart_buff), tone: "wart" });
+      if ((math.overdrive_bonus ?? 0) > 0) {
+        steps.push({ label: "Overdrive Fortune", value: `+${formatCoins(math.overdrive_bonus ?? 0)}`, tone: "fortune" });
+      }
       steps.push({ label: "Fortune Multiplier", value: formatPreciseValue(math.fortune), tone: "fortune" });
     }
 
@@ -762,19 +834,34 @@ export default function Home() {
                       <Image src="/icons/settings/evergreen-chip.svg" alt="Evergreen Chip" width={20} height={20} className="w-5 h-5 rounded-md" />
                       Evergreen Chip Level
                     </span>
-                    <span className="text-teal-600 dark:text-teal-400">{evergreenChipLevel}/20</span>
+                    <span className="text-teal-600 dark:text-teal-400">{evergreenChipLevel}/{chipRarityConfig[evergreenChipRarity].maxLevel}</span>
                   </label>
+                  <div className="mb-3 grid grid-cols-3 gap-2">
+                    {chipRarityOrder.map((rarity) => (
+                      <button
+                        key={`evergreen-${rarity}`}
+                        type="button"
+                        onClick={() => setEvergreenChipRarity(rarity)}
+                        className={`rounded-lg border px-2 py-1.5 text-[11px] font-semibold transition-colors ${evergreenChipRarity === rarity
+                          ? "border-teal-500 bg-teal-500 text-white"
+                          : "border-neutral-200 bg-white text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300"}`}
+                      >
+                        {chipRarityConfig[rarity].label}
+                      </button>
+                    ))}
+                  </div>
                   <input
                     type="range"
                     min="0"
-                    max="20"
+                    max={chipRarityConfig[evergreenChipRarity].maxLevel}
                     step="1"
                     value={evergreenChipLevel}
                     onChange={(e) => setEvergreenChipLevel(Number(e.target.value))}
                     className="w-full accent-teal-500"
                   />
                   <p className="mt-2 text-[11px] text-neutral-500 dark:text-neutral-400">
-                    Adds up to +60% more base crops at 20/20.
+                    {chipRarityConfig[evergreenChipRarity].label}: +{(chipRarityConfig[evergreenChipRarity].evergreenRate * 100).toFixed(1).replace(".0", "")}% base crops per level.
+                    Current bonus: +{(evergreenChipLevel * chipRarityConfig[evergreenChipRarity].evergreenRate * 100).toFixed(1).replace(".0", "")}%.
                   </p>
                 </div>
               </div>
@@ -842,20 +929,91 @@ export default function Home() {
                     <label className="flex items-center justify-between text-xs mb-1">
                       <span className="inline-flex items-center gap-2">
                         <Image src="/icons/buffs/hypercharge-chip.png" alt="Hypercharge Chip" width={20} height={20} className="w-5 h-5 rounded-sm" />
-                        Hypercharge Chip Level (0-20)
+                        Hypercharge Chip Level
                       </span>
-                      <span className="text-amber-600 dark:text-amber-400">{hyperchargeLevel}</span>
+                      <span className="text-amber-600 dark:text-amber-400">{hyperchargeLevel}/{chipRarityConfig[hyperchargeRarity].maxLevel}</span>
                     </label>
+                    <div className="mb-3 grid grid-cols-3 gap-2">
+                      {chipRarityOrder.map((rarity) => (
+                        <button
+                          key={`hypercharge-${rarity}`}
+                          type="button"
+                          onClick={() => setHyperchargeRarity(rarity)}
+                          className={`rounded-lg border px-2 py-1.5 text-[11px] font-semibold transition-colors ${hyperchargeRarity === rarity
+                            ? "border-amber-500 bg-amber-500 text-white"
+                            : "border-neutral-200 bg-white text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300"}`}
+                        >
+                          {chipRarityConfig[rarity].label}
+                        </button>
+                      ))}
+                    </div>
                     <input
                       type="range"
                       min="0"
-                      max="20"
+                      max={chipRarityConfig[hyperchargeRarity].maxLevel}
                       step="1"
                       value={hyperchargeLevel}
                       onChange={(e) => setHyperchargeLevel(Number(e.target.value))}
                       className="w-full accent-amber-500"
                     />
-                    <p className="text-[11px] text-neutral-500 mt-1">Hypercharge only scales affected buffs (Vacuum + Dark Cacao), up to +100% at level 20.</p>
+                    <p className="text-[11px] text-neutral-500 mt-1">
+                      {chipRarityConfig[hyperchargeRarity].label}: +{(chipRarityConfig[hyperchargeRarity].hyperchargeRate * 100).toFixed(0)}% affected buff strength per level.
+                      Current bonus: +{(hyperchargeLevel * chipRarityConfig[hyperchargeRarity].hyperchargeRate * 100).toFixed(0)}%.
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-neutral-200/80 bg-neutral-50/80 p-3 dark:border-neutral-800 dark:bg-neutral-950/40">
+                    <label className="flex items-center justify-between text-xs mb-1">
+                      <span className="inline-flex items-center gap-2">
+                        <Image src="/icons/settings/overdrive-chip.svg" alt="Overdrive Chip" width={20} height={20} className="w-5 h-5 rounded-sm" />
+                        Overdrive Chip Level
+                      </span>
+                      <span className="text-orange-600 dark:text-orange-400">{overdriveChipLevel}/{chipRarityConfig[overdriveChipRarity].maxLevel}</span>
+                    </label>
+                    <div className="mb-3 grid grid-cols-3 gap-2">
+                      {chipRarityOrder.map((rarity) => (
+                        <button
+                          key={`overdrive-${rarity}`}
+                          type="button"
+                          onClick={() => setOverdriveChipRarity(rarity)}
+                          className={`rounded-lg border px-2 py-1.5 text-[11px] font-semibold transition-colors ${overdriveChipRarity === rarity
+                            ? "border-orange-500 bg-orange-500 text-white"
+                            : "border-neutral-200 bg-white text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300"}`}
+                        >
+                          {chipRarityConfig[rarity].label}
+                        </button>
+                      ))}
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max={chipRarityConfig[overdriveChipRarity].maxLevel}
+                      step="1"
+                      value={overdriveChipLevel}
+                      onChange={(e) => setOverdriveChipLevel(Number(e.target.value))}
+                      className="w-full accent-orange-500"
+                    />
+                    <div className="mt-3">
+                      <label className="mb-1 block text-[11px] font-medium text-neutral-600 dark:text-neutral-300">Contest Crop</label>
+                      <select
+                        value={overdriveCrop}
+                        onChange={(e) => setOverdriveCrop(e.target.value)}
+                        className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-xs text-neutral-700 outline-none transition-colors focus:border-orange-400 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200"
+                      >
+                        <option value="">No contest crop</option>
+                        {displayCrops.map((crop) => (
+                          <option key={`overdrive-crop-${crop.key}`} value={crop.key}>
+                            {crop.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <p className="text-[11px] text-neutral-500 mt-2">
+                      {chipRarityConfig[overdriveChipRarity].label}: +{chipRarityConfig[overdriveChipRarity].overdriveBonus} crop fortune per level.
+                      {overdriveCrop
+                        ? ` Current bonus: +${formatCoins(overdriveChipLevel * chipRarityConfig[overdriveChipRarity].overdriveBonus)} to ${toCropLabel(overdriveCrop)}.`
+                        : " Select a contest crop to apply it."}
+                    </p>
                   </div>
                 </div>
               </div>
