@@ -147,6 +147,13 @@ const toMutationLabel = (mutation: string) => {
 const toMutationIconPath = (mutationName: string) =>
   `/icons/mutations/${mutationName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}.png`;
 const setupCostNote = "Some mutations decay after a few days, so setup cost may recur.";
+const lonelilyHarvestWarning = {
+  label: "LONELILY WARNING",
+  lines: [
+    "Lonelily has an extremely low spawn probability. Profit per harvest assumes that all planted mutations eventually spawn and grow, which may take a very long time in practice.",
+    "For realistic profitability, refer to Profit per Growth Cycle or Profit per Hour instead.",
+  ],
+};
 const getLeaderboardWarningTone = (item: LeaderboardItem) => {
   const hasMechanicalWarning = item.warning_messages?.some((message) => !message.startsWith("Market spreads")) ?? false;
 
@@ -191,22 +198,41 @@ const faqItems = [
   {
     question: "Why do some crops have warning icons?",
     answer: [
-      "Yellow warnings highlight large Bazaar price spreads, which can make setup cost or revenue estimates swing more than usual.",
-      "Red warnings are used for mutations with unusual mechanics or planting behavior that make real runs less reliable.",
+      "Warning icons highlight mutations that have unusual mechanics or conditions that may affect profitability calculations.",
+      "These warnings help explain when normal assumptions may not fully reflect in-game behavior.",
+      "Some warnings come from special mutation behavior, while others reflect wide Bazaar spreads that can distort pricing.",
     ],
   },
   {
     question: "Why does Devourer have a warning?",
     answer: [
       "Devourer spreads to nearby crops and can destroy surrounding plants over time.",
-      "It is technically possible to grow a lot of them at once, but large setups are inconsistent and generally not recommended unless the area is isolated very carefully.",
+      "Although it is technically possible to grow many at once, doing so reliably is extremely difficult and generally not recommended. The mutation spreads to nearby crops and can destroy them over time, making large-scale setups inconsistent and risky.",
     ],
   },
   {
     question: "Why does Lonelily behave differently?",
     answer: [
-      "Lonelily is treated as a much rarer spawn than the standard mutation pool when expected spawn time is calculated.",
-      "Its timing metrics use a dedicated estimated spawn chance so its Profit per Growth Cycle and Profit per Hour do not look unrealistically high.",
+      "Lonelily has a much lower spawn probability than other mutations.",
+      "Most mutations assume roughly a 25% spawn chance per valid farmland slot each growth cycle.",
+      "Lonelily instead spawns at an estimated rate of roughly 0.45% per slot per cycle.",
+      "Because of this extremely low spawn rate, the time required for a full harvest can be very long.",
+      "Profit per Harvest therefore represents the theoretical value of a completed harvest, but Profit per Growth Cycle and Profit per Hour provide a more realistic estimate of actual profitability.",
+    ],
+  },
+  {
+    question: "Why does Magic Jellybean show very large profits?",
+    answer: [
+      "Magic Jellybean grows through many stages and increases its multiplier over time.",
+      "When allowed to grow to the full 120 stages, it can reach a 10x multiplier, producing extremely large harvest values.",
+      "However this also means the mutation takes a very long time to mature.",
+    ],
+  },
+  {
+    question: "Why is All-in Aloe calculated differently?",
+    answer: [
+      "All-in Aloe has a unique mechanic where its multiplier increases over time but can randomly reset each cycle.",
+      "Because reaching the maximum multiplier would take an unrealistic amount of time in practice, the calculator assumes harvesting around stage 13-14, which is considered the most efficient point for most setups.",
     ],
   },
 ] as const;
@@ -1353,6 +1379,29 @@ export default function Home() {
                         ) : (
                           <td className="px-6 py-4 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
                             <div className="flex items-center justify-end gap-2">
+                              {mode === "profit" && item.mutationName === "Lonelily" && (
+                                <div className="group/lonelily relative">
+                                  <button
+                                    type="button"
+                                    aria-label={`${lonelilyHarvestWarning.label}: ${lonelilyHarvestWarning.lines.join(" ")}`}
+                                    className="inline-flex items-center"
+                                  >
+                                    <AlertTriangle className="h-4 w-4 text-amber-500 hover:text-amber-400" />
+                                  </button>
+                                  <div className="pointer-events-none absolute right-full top-1/2 z-10 mr-3 hidden w-80 -translate-y-1/2 rounded-xl border border-amber-500/30 bg-neutral-900 p-3 text-left text-xs tracking-wide text-white opacity-0 shadow-lg transition-opacity group-hover/lonelily:opacity-100 group-focus-within/lonelily:opacity-100 lg:block">
+                                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-200">
+                                      {lonelilyHarvestWarning.label}
+                                    </p>
+                                    <div className="text-white/90">
+                                      {lonelilyHarvestWarning.lines.map((line) => (
+                                        <p key={line} className="mb-2 leading-relaxed last:mb-0">
+                                          {line}
+                                        </p>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
                               {item.warning_messages && item.warning_messages.length > 0 && (
                                 <div className="group/warn relative">
                                   {(() => {
