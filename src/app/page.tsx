@@ -147,6 +147,25 @@ const toMutationLabel = (mutation: string) => {
 const toMutationIconPath = (mutationName: string) =>
   `/icons/mutations/${mutationName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}.png`;
 const setupCostNote = "Some mutations decay after a few days, so setup cost may recur.";
+const getLeaderboardWarningTone = (item: LeaderboardItem) => {
+  if (item.mutationName === "Devourer") {
+    return {
+      label: "Devourer warning",
+      icon: "text-red-500 hover:text-red-400",
+      panel: "border-red-500/30 bg-red-950/95 text-red-50",
+      heading: "text-red-200",
+      body: "text-red-100/90",
+    };
+  }
+
+  return {
+    label: "Warning",
+    icon: "text-yellow-500 hover:text-yellow-400",
+    panel: "border-amber-500/30 bg-neutral-900 text-white",
+    heading: "text-amber-200",
+    body: "text-white/90",
+  };
+};
 const faqItems = [
   {
     question: "What is Profit per Harvest?",
@@ -1271,15 +1290,27 @@ export default function Home() {
                           <td className="px-6 py-4 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
                             <div className="flex items-center justify-end gap-2">
                               {item.warning_messages && item.warning_messages.length > 0 && (
-                                <div className="group relative">
-                                  <AlertTriangle className="w-4 h-4 text-yellow-500 hover:text-yellow-600" />
-                                  <div className="absolute bottom-full right-0 z-10 mb-2 w-72 rounded bg-neutral-900 p-3 text-left text-xs tracking-wide text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-                                    {item.warning_messages.map((message) => (
-                                      <p key={message} className="mb-2 leading-relaxed last:mb-0">
-                                        {message}
-                                      </p>
-                                    ))}
-                                  </div>
+                                <div className="group/warn relative" title={item.warning_messages.join("\n")}>
+                                  {(() => {
+                                    const tone = getLeaderboardWarningTone(item);
+                                    return (
+                                      <>
+                                        <AlertTriangle className={`w-4 h-4 ${tone.icon}`} />
+                                        <div className={`pointer-events-none absolute right-full top-1/2 z-10 mr-3 hidden w-72 -translate-y-1/2 rounded-xl border p-3 text-left text-xs tracking-wide opacity-0 shadow-lg transition-opacity group-hover/warn:opacity-100 lg:block ${tone.panel}`}>
+                                          <p className={`mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] ${tone.heading}`}>
+                                            {tone.label}
+                                          </p>
+                                          <div className={tone.body}>
+                                            {item.warning_messages.map((message) => (
+                                              <p key={message} className="mb-2 leading-relaxed last:mb-0">
+                                                {message}
+                                              </p>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      </>
+                                    );
+                                  })()}
                                 </div>
                               )}
                               {formatCoins(mode === "target" ? item.score : item.profit)}
