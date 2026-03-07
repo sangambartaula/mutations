@@ -860,7 +860,7 @@ export default function Home() {
                 <div>
                   <label className="flex justify-between items-center text-sm font-medium mb-2">
                     <span className="inline-flex items-center gap-2">
-                      <Image src="/icons/settings/seeds.png" alt="Seeds" width={20} height={20} className="w-5 h-5 rounded-md object-contain pixelated" />
+                      <Image src="/icons/buffs/seeds.png" alt="Seeds" width={20} height={20} className="w-5 h-5 rounded-md object-contain pixelated" />
                       Unique Crops Placed
                     </span>
                     <span className="text-sky-600 dark:text-sky-400">{uniqueCrops}/12</span>
@@ -879,7 +879,7 @@ export default function Home() {
                   <label className="flex items-start justify-between gap-3">
                     <span className="min-w-0">
                       <span className="inline-flex items-center gap-2 text-sm font-medium text-neutral-800 dark:text-neutral-100">
-                        <Image src="/icons/settings/nether-wart.png" alt="Nether Wart" width={20} height={20} className="w-5 h-5 rounded-md object-contain pixelated" />
+                        <Image src="/icons/buffs/wart.png" alt="Nether Wart" width={20} height={20} className="w-5 h-5 rounded-md object-contain pixelated" />
                         Improved Harvest Boost (Wart Buff)
                         <span className="group relative inline-flex">
                           <button
@@ -907,7 +907,7 @@ export default function Home() {
                 <div>
                   <label className="flex justify-between items-center text-sm font-medium mb-2">
                     <span className="inline-flex items-center gap-2">
-                      <Image src="/icons/settings/evergreen-chip.png" alt="Evergreen Chip" width={20} height={20} className="w-5 h-5 rounded-md object-contain pixelated" />
+                      <Image src="/icons/buffs/evergreen.webp" alt="Evergreen Chip" width={20} height={20} className="w-5 h-5 rounded-md object-contain pixelated" />
                       Evergreen Chip Level
                     </span>
                     <span className="text-teal-600 dark:text-teal-400">{evergreenChipLevel}/{chipRarityConfig[evergreenChipRarity].maxLevel}</span>
@@ -1041,7 +1041,7 @@ export default function Home() {
                   <div className="rounded-xl border border-neutral-200/80 bg-neutral-50/80 p-3 dark:border-neutral-800 dark:bg-neutral-950/40">
                     <label className="flex items-center justify-between text-xs mb-1">
                       <span className="inline-flex items-center gap-2">
-                        <Image src="/icons/settings/overdrive-chip.png" alt="Overdrive Chip" width={20} height={20} className="w-5 h-5 rounded-sm object-contain pixelated" />
+                        <Image src="/icons/buffs/overdrive.webp" alt="Overdrive Chip" width={20} height={20} className="w-5 h-5 rounded-sm object-contain pixelated" />
                         Overdrive Chip Level
                       </span>
                       <span className="text-orange-600 dark:text-orange-400">{overdriveChipLevel}/{chipRarityConfig[overdriveChipRarity].maxLevel}</span>
