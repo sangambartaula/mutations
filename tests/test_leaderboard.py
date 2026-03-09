@@ -155,6 +155,121 @@ class LeaderboardTests(unittest.TestCase):
         self.assertEqual(result["metadata"]["yield_breakdown"]["overdrive_bonus"], 50.0)
 
     @patch("api.index.get_bazaar_prices", return_value={})
+    def test_harvest_boost_tiers_apply_expected_yield_multipliers(self, _mock_prices):
+        base = get_leaderboard(
+            plots=3,
+            fortune=0,
+            gh_yield_upgrade=0,
+            gh_speed_upgrade=0,
+            unique_crops=0,
+            evergreen_chip_level=0,
+            harvest_boost=False,
+            improved_harvest_boost=False,
+            mode="profit",
+            setup_mode="buy_order",
+            sell_mode="sell_offer",
+            target_crop=None,
+            maxed_crops="",
+        )
+        harvest = get_leaderboard(
+            plots=3,
+            fortune=0,
+            gh_yield_upgrade=0,
+            gh_speed_upgrade=0,
+            unique_crops=0,
+            evergreen_chip_level=0,
+            harvest_boost=True,
+            improved_harvest_boost=False,
+            mode="profit",
+            setup_mode="buy_order",
+            sell_mode="sell_offer",
+            target_crop=None,
+            maxed_crops="",
+        )
+        improved = get_leaderboard(
+            plots=3,
+            fortune=0,
+            gh_yield_upgrade=0,
+            gh_speed_upgrade=0,
+            unique_crops=0,
+            evergreen_chip_level=0,
+            harvest_boost=False,
+            improved_harvest_boost=True,
+            mode="profit",
+            setup_mode="buy_order",
+            sell_mode="sell_offer",
+            target_crop=None,
+            maxed_crops="",
+        )
+
+        self.assertAlmostEqual(base["metadata"]["yield_breakdown"]["harvest_boost_multiplier"], 1.0, places=6)
+        self.assertAlmostEqual(harvest["metadata"]["yield_breakdown"]["harvest_boost_multiplier"], 1.2, places=6)
+        self.assertAlmostEqual(improved["metadata"]["yield_breakdown"]["harvest_boost_multiplier"], 1.3, places=6)
+
+        devourer_base = next((m for m in base["leaderboard"] if m["mutationName"] == "Devourer"), None)
+        devourer_harvest = next((m for m in harvest["leaderboard"] if m["mutationName"] == "Devourer"), None)
+        devourer_improved = next((m for m in improved["leaderboard"] if m["mutationName"] == "Devourer"), None)
+        self.assertIsNotNone(devourer_base)
+        self.assertIsNotNone(devourer_harvest)
+        self.assertIsNotNone(devourer_improved)
+
+        pumpkin_base = next((y for y in devourer_base["breakdown"]["yields"] if y["name"] == "Pumpkin"), None)
+        pumpkin_harvest = next((y for y in devourer_harvest["breakdown"]["yields"] if y["name"] == "Pumpkin"), None)
+        pumpkin_improved = next((y for y in devourer_improved["breakdown"]["yields"] if y["name"] == "Pumpkin"), None)
+        self.assertIsNotNone(pumpkin_base)
+        self.assertIsNotNone(pumpkin_harvest)
+        self.assertIsNotNone(pumpkin_improved)
+
+        self.assertAlmostEqual(pumpkin_harvest["amount"] / pumpkin_base["amount"], 1.2, places=6)
+        self.assertAlmostEqual(pumpkin_improved["amount"] / pumpkin_base["amount"], 1.3, places=6)
+
+    @patch("api.index.get_bazaar_prices", return_value={})
+    def test_improved_harvest_boost_overwrites_regular_harvest_boost(self, _mock_prices):
+        improved_only = get_leaderboard(
+            plots=3,
+            fortune=0,
+            gh_yield_upgrade=0,
+            gh_speed_upgrade=0,
+            unique_crops=0,
+            evergreen_chip_level=0,
+            harvest_boost=False,
+            improved_harvest_boost=True,
+            mode="profit",
+            setup_mode="buy_order",
+            sell_mode="sell_offer",
+            target_crop=None,
+            maxed_crops="",
+        )
+        both_enabled = get_leaderboard(
+            plots=3,
+            fortune=0,
+            gh_yield_upgrade=0,
+            gh_speed_upgrade=0,
+            unique_crops=0,
+            evergreen_chip_level=0,
+            harvest_boost=True,
+            improved_harvest_boost=True,
+            mode="profit",
+            setup_mode="buy_order",
+            sell_mode="sell_offer",
+            target_crop=None,
+            maxed_crops="",
+        )
+
+        self.assertAlmostEqual(both_enabled["metadata"]["yield_breakdown"]["harvest_boost_multiplier"], 1.3, places=6)
+
+        devourer_improved = next((m for m in improved_only["leaderboard"] if m["mutationName"] == "Devourer"), None)
+        devourer_both = next((m for m in both_enabled["leaderboard"] if m["mutationName"] == "Devourer"), None)
+        self.assertIsNotNone(devourer_improved)
+        self.assertIsNotNone(devourer_both)
+
+        pumpkin_improved = next((y for y in devourer_improved["breakdown"]["yields"] if y["name"] == "Pumpkin"), None)
+        pumpkin_both = next((y for y in devourer_both["breakdown"]["yields"] if y["name"] == "Pumpkin"), None)
+        self.assertIsNotNone(pumpkin_improved)
+        self.assertIsNotNone(pumpkin_both)
+        self.assertAlmostEqual(pumpkin_both["amount"], pumpkin_improved["amount"], places=6)
+
+    @patch("api.index.get_bazaar_prices", return_value={})
     def test_overdrive_bonus_only_applies_to_matching_crop(self, _mock_prices):
         baseline = get_leaderboard(
             plots=3,
@@ -269,6 +384,28 @@ class LeaderboardTests(unittest.TestCase):
         self.assertAlmostEqual(veil["breakdown"]["estimated_time_hours"], ashwreath["breakdown"]["estimated_time_hours"], places=6)
         expected_hours = ((1.0 / DEFAULT_METRIC_SPAWN_CHANCE) + 1.0) * result["metadata"]["cycle_time_hours"]
         self.assertAlmostEqual(veil["hourly"]["expected_hours"], expected_hours, places=6)
+
+    @patch("api.index.get_bazaar_prices", return_value={})
+    def test_timestalk_one_plot_ingredient_amounts_match_expected_recipe(self, _mock_prices):
+        result = get_leaderboard(
+            plots=1,
+            fortune=2500,
+            gh_upgrade=9,
+            unique_crops=12,
+            mode="profit",
+            setup_mode="buy_order",
+            sell_mode="sell_offer",
+            target_crop=None,
+            maxed_crops="",
+        )
+
+        timestalk = next((m for m in result["leaderboard"] if m["mutationName"] == "Timestalk"), None)
+        self.assertIsNotNone(timestalk, "Timestalk should be present in leaderboard output.")
+
+        ingredient_amounts = {i["name"]: i["amount"] for i in timestalk["breakdown"]["ingredients"]}
+        self.assertEqual(ingredient_amounts.get("Shellfruit"), 24)
+        self.assertEqual(ingredient_amounts.get("Stoplight Petal"), 23)
+        self.assertEqual(ingredient_amounts.get("Chorus Fruit"), 18)
 
     @patch("api.index.get_bazaar_prices", return_value={})
     def test_zero_growth_stage_mutations_keep_instant_display_fields(self, _mock_prices):

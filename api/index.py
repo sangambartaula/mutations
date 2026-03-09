@@ -477,6 +477,7 @@ def get_leaderboard(
     harvest_harbinger: bool = Query(False),
     infini_vacuum: bool = Query(False),
     dark_cacao: bool = Query(False),
+    harvest_boost: bool = Query(False),
     improved_harvest_boost: bool = Query(True),
     hypercharge_level: int | None = Query(None, ge=0, le=20),
     hypercharge_rarity: str = Query("legendary"),
@@ -562,8 +563,13 @@ def get_leaderboard(
     effective_fortune = fortune + total_bonus
     overdrive_bonus = overdrive_chip_level * OVERDRIVE_BONUS_PER_LEVEL[overdrive_chip_rarity]
 
-    wart_buff = 1.3 if improved_harvest_boost else 1.0
-    base_yield_mult = additive_base * wart_buff
+    if improved_harvest_boost:
+        harvest_boost_multiplier = 1.3
+    elif harvest_boost:
+        harvest_boost_multiplier = 1.2
+    else:
+        harvest_boost_multiplier = 1.0
+    base_yield_mult = additive_base * harvest_boost_multiplier
     
     leaderboard_data = []
     
@@ -662,7 +668,8 @@ def get_leaderboard(
                         "evergreen_buff": evergreen_buff,
                         "gh_buff": gh_buff,
                         "unique_buff": unique_buff,
-                        "wart_buff": wart_buff,
+                        "harvest_boost": harvest_boost_multiplier,
+                        "wart_buff": harvest_boost_multiplier,
                         "fortune": crop_fortune_mult,
                         "overdrive_bonus": crop_overdrive_bonus,
                         "special": effective_special_mult,
@@ -687,6 +694,7 @@ def get_leaderboard(
                     "evergreen_buff": 0.0,
                     "gh_buff": 0.0,
                     "unique_buff": 0.0,
+                    "harvest_boost": 1.0,
                     "wart_buff": 1.0,
                     "fortune": 1.0,
                     "special": 1.0,
@@ -815,7 +823,10 @@ def get_leaderboard(
                 "greenhouse_yield_bonus": gh_buff,
                 "unique_crops": unique_crops,
                 "unique_crop_bonus": unique_buff,
-                "wart_multiplier": wart_buff,
+                "harvest_boost": harvest_boost,
+                "improved_harvest_boost": improved_harvest_boost,
+                "harvest_boost_multiplier": harvest_boost_multiplier,
+                "wart_multiplier": harvest_boost_multiplier,
                 "overdrive_chip_level": overdrive_chip_level,
                 "overdrive_chip_rarity": overdrive_chip_rarity,
                 "overdrive_crop": normalized_overdrive_crop,

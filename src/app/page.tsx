@@ -18,7 +18,8 @@ type YieldMath = {
   evergreen_buff?: number;
   gh_buff: number;
   unique_buff: number;
-  wart_buff: number;
+  harvest_boost?: number;
+  wart_buff?: number;
   fortune: number;
   overdrive_bonus?: number;
   special: number;
@@ -39,7 +40,7 @@ type YieldItem = {
   math?: YieldMath;
 };
 
-type CalculationTone = "neutral" | "plots" | "garden" | "unique" | "evergreen" | "wart" | "fortune" | "special";
+type CalculationTone = "neutral" | "plots" | "garden" | "unique" | "evergreen" | "harvest" | "fortune" | "special";
 
 type CalculationStep = {
   label: string;
@@ -103,7 +104,10 @@ type LeaderboardResponse = {
       greenhouse_yield_bonus: number;
       unique_crops: number;
       unique_crop_bonus: number;
-      wart_multiplier: number;
+      harvest_boost?: boolean;
+      improved_harvest_boost?: boolean;
+      harvest_boost_multiplier?: number;
+      wart_multiplier?: number;
       overdrive_chip_level: number;
       overdrive_chip_rarity: ChipRarity;
       overdrive_crop?: string | null;
@@ -240,6 +244,7 @@ const faqItems = [
 export default function Home() {
   const [plots, setPlots] = useState(3);
   const [fortune, setFortune] = useState(2500);
+  const [useHarvestBoost, setUseHarvestBoost] = useState(false);
   const [useImprovedHarvestBoost, setUseImprovedHarvestBoost] = useState(true);
   const [useHarvestHarbinger, setUseHarvestHarbinger] = useState(false);
   const [useInfiniVacuum, setUseInfiniVacuum] = useState(false);
@@ -321,6 +326,7 @@ export default function Home() {
         const parsed = JSON.parse(saved) as Record<string, unknown>;
         if (typeof parsed.plots === "number") setPlots(Math.max(1, Math.min(3, parsed.plots)));
         if (typeof parsed.fortune === "number") setFortune(Math.max(0, Math.min(4000, parsed.fortune)));
+        if (typeof parsed.useHarvestBoost === "boolean") setUseHarvestBoost(parsed.useHarvestBoost);
         if (typeof parsed.useImprovedHarvestBoost === "boolean") setUseImprovedHarvestBoost(parsed.useImprovedHarvestBoost);
         if (typeof parsed.useHarvestHarbinger === "boolean") setUseHarvestHarbinger(parsed.useHarvestHarbinger);
         if (typeof parsed.useInfiniVacuum === "boolean") setUseInfiniVacuum(parsed.useInfiniVacuum);
@@ -362,6 +368,7 @@ export default function Home() {
       localStorage.setItem("mutations:settings", JSON.stringify({
         plots,
         fortune,
+        useHarvestBoost,
         useImprovedHarvestBoost,
         useHarvestHarbinger,
         useInfiniVacuum,
@@ -385,6 +392,7 @@ export default function Home() {
   }, [
     plots,
     fortune,
+    useHarvestBoost,
     useImprovedHarvestBoost,
     useHarvestHarbinger,
     useInfiniVacuum,
@@ -416,6 +424,12 @@ export default function Home() {
   }, [overdriveChipRarity]);
 
   useEffect(() => {
+    if (useHarvestBoost && useImprovedHarvestBoost) {
+      setUseHarvestBoost(false);
+    }
+  }, [useHarvestBoost, useImprovedHarvestBoost]);
+
+  useEffect(() => {
     if (mode !== "profit" && (sortKey === "growth_cycle_profit" || sortKey === "profit_per_hour")) {
       setSortKey("value");
       setSortDirection("desc");
@@ -431,6 +445,7 @@ export default function Home() {
     const query = new URLSearchParams({
       plots: plots.toString(),
       fortune: fortune.toString(),
+      harvest_boost: useHarvestBoost ? "true" : "false",
       improved_harvest_boost: useImprovedHarvestBoost ? "true" : "false",
       harvest_harbinger: useHarvestHarbinger ? "true" : "false",
       infini_vacuum: useInfiniVacuum ? "true" : "false",
@@ -488,6 +503,7 @@ export default function Home() {
   }, [
     plots,
     fortune,
+    useHarvestBoost,
     useImprovedHarvestBoost,
     useHarvestHarbinger,
     useInfiniVacuum,
@@ -527,6 +543,20 @@ export default function Home() {
 
   const markAllAsMissing = () => {
     setMaxedCrops([]);
+  };
+
+  const handleHarvestBoostToggle = (checked: boolean) => {
+    setUseHarvestBoost(checked);
+    if (checked) {
+      setUseImprovedHarvestBoost(false);
+    }
+  };
+
+  const handleImprovedHarvestBoostToggle = (checked: boolean) => {
+    setUseImprovedHarvestBoost(checked);
+    if (checked) {
+      setUseHarvestBoost(false);
+    }
   };
 
   const formatCoins = (num: number) => {
@@ -588,7 +618,7 @@ export default function Home() {
       garden: "border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-100",
       unique: "border-sky-500/30 bg-sky-500/10 text-sky-100",
       evergreen: "border-teal-500/30 bg-teal-500/10 text-teal-100",
-      wart: "border-red-500/30 bg-red-500/10 text-red-100",
+      harvest: "border-red-500/30 bg-red-500/10 text-red-100",
       fortune: "border-amber-500/30 bg-amber-500/10 text-amber-100",
       special: "border-cyan-500/30 bg-cyan-500/10 text-cyan-100",
     };
@@ -603,12 +633,13 @@ export default function Home() {
     const totalSpots = spotsPerPlot * plots;
     const spawnFactor = totalSpots > 0 ? math.limit / totalSpots : 1;
     const evergreenBuff = math.evergreen_buff ?? 0;
+    const harvestBoostMultiplier = math.harvest_boost ?? math.wart_buff ?? 1;
     const isPlainMutationMath =
       math.base === 1 &&
       evergreenBuff === 0 &&
       math.gh_buff === 0 &&
       math.unique_buff === 0 &&
-      math.wart_buff === 1 &&
+      harvestBoostMultiplier === 1 &&
       math.fortune === 1 &&
       math.special === 1;
     const steps: CalculationStep[] = [
@@ -632,7 +663,7 @@ export default function Home() {
       if (math.unique_buff !== 0) {
         steps.push({ label: "Unique Crops", value: `+${formatPreciseValue(math.unique_buff)}`, tone: "unique" });
       }
-      steps.push({ label: "Wart Boost", value: formatPreciseValue(math.wart_buff), tone: "wart" });
+      steps.push({ label: "Harvest Boost", value: formatPreciseValue(harvestBoostMultiplier), tone: "harvest" });
       if ((math.overdrive_bonus ?? 0) > 0) {
         steps.push({ label: "Overdrive Fortune", value: `+${formatCoins(math.overdrive_bonus ?? 0)}`, tone: "fortune" });
       }
@@ -875,33 +906,74 @@ export default function Home() {
                   />
                 </div>
 
-                <div className="rounded-xl border border-neutral-200/80 bg-white/80 p-3 dark:border-neutral-800 dark:bg-neutral-900/70">
-                  <label className="flex items-start justify-between gap-3">
-                    <span className="min-w-0">
-                      <span className="inline-flex items-center gap-2 text-sm font-medium text-neutral-800 dark:text-neutral-100">
-                        <Image src="/icons/buffs/wart.png" alt="Nether Wart" width={20} height={20} className="w-5 h-5 rounded-md object-contain pixelated" />
-                        Improved Harvest Boost (Wart Buff)
-                        <span className="group relative inline-flex">
-                          <button
-                            type="button"
-                            tabIndex={0}
-                            aria-label="Improved Harvest Boost info"
-                            onClick={(e) => e.preventDefault()}
-                            className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-neutral-300 text-[10px] leading-none text-neutral-500 dark:border-neutral-700 dark:text-neutral-400"
-                          >
-                            <Info className="h-3 w-3" />
-                          </button>
-                          <span className="absolute left-1/2 top-full z-20 mt-2 w-56 -translate-x-1/2 rounded bg-neutral-900 px-3 py-2 text-left text-[11px] font-normal normal-case tracking-normal text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-                            Applies the Nether Wart farming multiplier.
+                <div className="grid gap-3">
+                  <div className="rounded-xl border border-neutral-200/80 bg-white/80 p-3 dark:border-neutral-800 dark:bg-neutral-900/70">
+                    <label className="flex items-start justify-between gap-3">
+                      <span className="min-w-0">
+                        <span className="inline-flex items-center gap-2 text-sm font-medium text-neutral-800 dark:text-neutral-100">
+                          <Image src="/icons/buffs/wheat.png" alt="Harvest Boost icon" width={20} height={20} className="w-5 h-5 rounded-md object-contain pixelated" />
+                          Harvest Boost (Increases Yield by +20%)
+                          <span className="group relative inline-flex">
+                            <button
+                              type="button"
+                              tabIndex={0}
+                              aria-label="Harvest Boost info"
+                              onClick={(e) => e.preventDefault()}
+                              className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-neutral-300 text-[10px] leading-none text-neutral-500 dark:border-neutral-700 dark:text-neutral-400"
+                            >
+                              <Info className="h-3 w-3" />
+                            </button>
+                            <span className="absolute left-1/2 top-full z-20 mt-2 w-56 -translate-x-1/2 rounded bg-neutral-900 px-3 py-2 text-left text-[11px] font-normal normal-case tracking-normal text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                              Apply this boost if your mutations will have a Harvest Boost.
+                            </span>
                           </span>
                         </span>
+                        <span className="mt-1 block text-[11px] text-neutral-500 dark:text-neutral-400">
+                          Current boost: {useHarvestBoost ? "1.20x" : "1.00x"}
+                        </span>
                       </span>
-                      <span className="mt-1 block text-[11px] text-neutral-500 dark:text-neutral-400">
-                        Current wart boost: {useImprovedHarvestBoost ? "1.30x" : "1.00x"}
+                      <input
+                        type="checkbox"
+                        checked={useHarvestBoost}
+                        onChange={(e) => handleHarvestBoostToggle(e.target.checked)}
+                        className="mt-0.5 accent-emerald-500"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="rounded-xl border border-neutral-200/80 bg-white/80 p-3 dark:border-neutral-800 dark:bg-neutral-900/70">
+                    <label className="flex items-start justify-between gap-3">
+                      <span className="min-w-0">
+                        <span className="inline-flex items-center gap-2 text-sm font-medium text-neutral-800 dark:text-neutral-100">
+                          <Image src="/icons/buffs/wart.png" alt="Improved Harvest Boost icon" width={20} height={20} className="w-5 h-5 rounded-md object-contain pixelated" />
+                          Improved Harvest Boost (Increases Yield by +30%)
+                          <span className="group relative inline-flex">
+                            <button
+                              type="button"
+                              tabIndex={0}
+                              aria-label="Improved Harvest Boost info"
+                              onClick={(e) => e.preventDefault()}
+                              className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-neutral-300 text-[10px] leading-none text-neutral-500 dark:border-neutral-700 dark:text-neutral-400"
+                            >
+                              <Info className="h-3 w-3" />
+                            </button>
+                            <span className="absolute left-1/2 top-full z-20 mt-2 w-56 -translate-x-1/2 rounded bg-neutral-900 px-3 py-2 text-left text-[11px] font-normal normal-case tracking-normal text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                              Apply this boost if your mutations will have an Increased Harvest Boost.
+                            </span>
+                          </span>
+                        </span>
+                        <span className="mt-1 block text-[11px] text-neutral-500 dark:text-neutral-400">
+                          Current boost: {useImprovedHarvestBoost ? "1.30x" : "1.00x"}
+                        </span>
                       </span>
-                    </span>
-                    <input type="checkbox" checked={useImprovedHarvestBoost} onChange={(e) => setUseImprovedHarvestBoost(e.target.checked)} className="mt-0.5 accent-emerald-500" />
-                  </label>
+                      <input
+                        type="checkbox"
+                        checked={useImprovedHarvestBoost}
+                        onChange={(e) => handleImprovedHarvestBoostToggle(e.target.checked)}
+                        className="mt-0.5 accent-emerald-500"
+                      />
+                    </label>
+                  </div>
                 </div>
 
                 <div>
@@ -1674,7 +1746,7 @@ export default function Home() {
                                     </div>
                                     {showsAdditiveGardenBreakdown(yld.math) && (
                                       <p className="text-[10px] text-neutral-500">
-                                        Yield bonuses stack before wart, fortune, and special
+                                        Yield bonuses stack before harvest boost, fortune, and special
                                       </p>
                                     )}
                                   </div>
