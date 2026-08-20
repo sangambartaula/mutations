@@ -1752,7 +1752,7 @@ export default function Home() {
                                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
                                       {getYieldCalculationSteps(yld).map((step, index) => (
                                         <Fragment key={`${yld.name}-${step.label}`}>
-                                          {index > 0 && <span className="text-xs font-black text-neutral-500">×</span>}
+                                          {index > 0 && <span className="text-xs font-black text-neutral-500">Ã—</span>}
                                           <div className={`rounded-lg border px-2 py-1.5 ${getCalculationToneClasses(step.tone)}`}>
                                             <div className="flex flex-wrap items-center gap-1 whitespace-normal">
                                               <p className="text-[9px] font-semibold uppercase tracking-[0.12em] opacity-70">{step.label}</p>
