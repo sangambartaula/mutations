@@ -1710,19 +1710,19 @@ export default function Home() {
                     </div>
 
                     {selectedMutation.breakdown.ingredients.length > 0 ? (
-                      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+                      <div className="grid gap-3 grid-cols-1">
                         {selectedMutation.breakdown.ingredients.map((ing) => (
-                          <div key={ing.name} className="rounded-2xl border border-neutral-200/70 bg-white/85 p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/70">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-400">Ingredient</p>
-                                <p className="mt-2 text-base font-bold text-neutral-900 dark:text-white">
+                          <div key={ing.name} className="rounded-2xl border border-neutral-200/70 bg-white/85 p-3.5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/70">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="min-w-0 flex-1">
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-400">Ingredient</p>
+                                <p className="mt-1 text-sm font-bold text-neutral-900 dark:text-white truncate">
                                   {ing.amount}x <span className="text-emerald-700 dark:text-emerald-300">{toCropLabel(ing.name)}</span>
                                 </p>
                               </div>
-                              <div className="rounded-xl border border-amber-200/70 bg-amber-50 px-3 py-2 text-right dark:border-amber-900/40 dark:bg-amber-950/20">
-                                <div className="font-mono text-sm font-black text-amber-600 dark:text-amber-300">{formatCoins(ing.total_cost)}</div>
-                                <div className="mt-0.5 text-[10px] font-mono text-neutral-500 dark:text-neutral-400">{formatCoins(ing.unit_price)} each</div>
+                              <div className="shrink-0 rounded-xl border border-amber-200/70 bg-amber-50 px-2.5 py-1.5 text-right dark:border-amber-900/40 dark:bg-amber-950/20">
+                                <div className="font-mono text-xs font-black text-amber-600 dark:text-amber-300 whitespace-nowrap">{formatCoins(ing.total_cost)}</div>
+                                <div className="mt-0.5 text-[9px] font-mono text-neutral-500 dark:text-neutral-400 whitespace-nowrap">{formatCoins(ing.unit_price)} each</div>
                               </div>
                             </div>
                           </div>

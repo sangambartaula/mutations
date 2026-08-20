@@ -191,7 +191,7 @@ DEFAULT_SPECIAL_MULTIPLIER_BY_MUTATION = {
     "All-in Aloe": 1.8,
 }
 
-SPREAD_WARNING_RATIO = 2.0  # 100% difference => 2x between two prices.
+SPREAD_WARNING_RATIO = 1.5  # 50% difference => 1.5x ratio between prices.
 DEFAULT_METRIC_SPAWN_CHANCE = 0.25
 LONELILY_METRIC_SPAWN_CHANCE = 0.0045
 CHIP_LEVEL_CAP_BY_RARITY: Dict[str, int] = {
@@ -726,7 +726,7 @@ def get_leaderboard(
         profit_per_growth_cycle = finite_or_none(profit_models.get("profit_per_cycle"))
         profit_per_hour = finite_or_zero(profit_models.get("profit_per_hour"))
         hourly_profit_selected = finite_or_none(profit_models.get("profit_per_hour"))
-        warning_messages = build_warning_messages(mut_name, mut_warning or ing_warning)
+        warning_messages = build_warning_messages(mut_name, mut_warning)
 
         payback_hours_ready = (opt_cost / hourly_profit_selected) if (hourly_profit_selected is not None and hourly_profit_selected > 0) else None
 
