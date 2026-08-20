@@ -265,7 +265,7 @@ export default function Home() {
   const [sortKey, setSortKey] = useState<SortKey>("value");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
-  // New Toggles
+  const [isIronman, setIsIronman] = useState(false);
   const [setupMode, setSetupMode] = useState<SetupMode>("buy_order");
   const [sellMode, setSellMode] = useState<SellMode>("sell_offer");
 
@@ -354,6 +354,7 @@ export default function Home() {
           setOverdriveChipLevel(clampChipLevelByRarity(parsed.overdriveChipLevel, parsedOverdriveRarity));
         }
         if (typeof parsed.overdriveCrop === "string") setOverdriveCrop(parsed.overdriveCrop);
+        if (typeof parsed.isIronman === "boolean") setIsIronman(parsed.isIronman);
         if (parsed.setupMode === "buy_order" || parsed.setupMode === "insta_buy") setSetupMode(parsed.setupMode);
         if (parsed.sellMode === "sell_offer" || parsed.sellMode === "insta_sell") setSellMode(parsed.sellMode);
       }
@@ -382,6 +383,7 @@ export default function Home() {
         overdriveChipLevel,
         overdriveChipRarity,
         overdriveCrop,
+        isIronman,
         setupMode,
         sellMode,
       }));
@@ -406,6 +408,7 @@ export default function Home() {
     overdriveChipLevel,
     overdriveChipRarity,
     overdriveCrop,
+    isIronman,
     setupMode,
     sellMode,
   ]);
@@ -458,6 +461,7 @@ export default function Home() {
       evergreen_chip_rarity: evergreenChipRarity,
       overdrive_chip_level: overdriveChipLevel.toString(),
       overdrive_chip_rarity: overdriveChipRarity,
+      is_ironman: isIronman ? "true" : "false",
       mode: mode,
       setup_mode: setupMode,
       sell_mode: sellMode,
@@ -518,6 +522,7 @@ export default function Home() {
     overdriveChipRarity,
     overdriveCrop,
     mode,
+    isIronman,
     setupMode,
     sellMode,
     targetCrop,
@@ -847,6 +852,41 @@ export default function Home() {
                     className={`flex-1 text-xs py-1.5 rounded-lg transition-colors ${sellMode === "insta_sell" ? "bg-emerald-500 text-white shadow-sm font-medium" : "text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"}`}
                   >Insta-Sell</button>
                 </div>
+              </div>
+
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => setIsIronman((prev) => !prev)}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl border text-xs font-medium transition-all ${
+                    isIronman
+                      ? "border-slate-400/80 bg-slate-800/90 text-slate-100 shadow-sm"
+                      : "border-neutral-200 dark:border-neutral-800 bg-neutral-100/60 dark:bg-neutral-800/50 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <Image
+                      src="/icons/settings/iron-chestplate.svg"
+                      alt="Iron Chestplate"
+                      width={20}
+                      height={20}
+                      className="w-5 h-5 rounded object-contain pixelated"
+                    />
+                    Ironman Mode
+                  </span>
+                  <span
+                    className={`px-2 py-0.5 rounded-md text-[10px] uppercase font-bold tracking-wider ${
+                      isIronman
+                        ? "bg-slate-200 text-slate-900"
+                        : "bg-neutral-200/80 dark:bg-neutral-700 text-neutral-500 dark:text-neutral-400"
+                    }`}
+                  >
+                    {isIronman ? "ON" : "OFF"}
+                  </span>
+                </button>
+                <p className="mt-1.5 text-[11px] text-neutral-500 dark:text-neutral-400">
+                  Sets mutation NPC sell prices to 0 (Ironman players cannot sell mutations on BZ).
+                </p>
               </div>
             </div>
 

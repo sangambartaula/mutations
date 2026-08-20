@@ -679,6 +679,27 @@ class LeaderboardTests(unittest.TestCase):
         self.assertAlmostEqual(lonelily["hourly"]["expected_cycles"], expected_cycles, places=6)
         self.assertAlmostEqual(lonelily["hourly"]["profit_per_hour_selected"], lonelily["profit"] / expected_hours, places=6)
 
+    @patch("api.index.get_cached_bazaar_prices", return_value={"Ashwreath": {"buyPrice": 500.0, "sellPrice": 450.0}})
+    def test_ironman_mode_zeros_mutation_sell_values(self, _mock_prices):
+        normal_res = get_leaderboard(plots=1, is_ironman=False)
+        ironman_res = get_leaderboard(plots=1, is_ironman=True)
+
+        normal_ash = next((m for m in normal_res["leaderboard"] if m["mutationName"] == "Ashwreath"), None)
+        ironman_ash = next((m for m in ironman_res["leaderboard"] if m["mutationName"] == "Ashwreath"), None)
+
+        self.assertIsNotNone(normal_ash)
+        self.assertIsNotNone(ironman_ash)
+        self.assertGreater(normal_ash["mut_price"], 0)
+        self.assertEqual(ironman_ash["mut_price"], 0.0)
+
+        normal_mut_yield = next((y for y in normal_ash["breakdown"]["yields"] if y["name"] == "Ashwreath"), None)
+        ironman_mut_yield = next((y for y in ironman_ash["breakdown"]["yields"] if y["name"] == "Ashwreath"), None)
+
+        self.assertIsNotNone(normal_mut_yield)
+        self.assertIsNotNone(ironman_mut_yield)
+        self.assertGreater(normal_mut_yield["total_value"], 0)
+        self.assertEqual(ironman_mut_yield["total_value"], 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()

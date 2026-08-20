@@ -487,6 +487,7 @@ def get_leaderboard(
     overdrive_chip_rarity: str = Query("legendary"),
     overdrive_crop: str | None = Query(None),
     per_harvest_cost: float = Query(0.0, ge=0.0),
+    is_ironman: bool = Query(False),
 ) -> Dict[str, Any]:
     # Normalize FastAPI Query defaults when function is called directly in tests/scripts.
     def normalized_int(value: Any, *, default: int, minimum: int, maximum: int) -> int:
@@ -623,7 +624,7 @@ def get_leaderboard(
             if has_wide_spread(ing_market.get("buyPrice", 0), ing_market.get("sellPrice", 0)):
                 ing_warning = True
 
-        mut_sell_price_value = get_item_price(mut_name, False, sell_mode)
+        mut_sell_price_value = 0.0 if is_ironman else get_item_price(mut_name, False, sell_mode)
         market_data = bazaar_data.get(mut_name, {"buyPrice": 0, "sellPrice": 0})
         mut_warning = has_wide_spread(market_data.get("buyPrice", 0), market_data.get("sellPrice", 0))
 
