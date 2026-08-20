@@ -866,7 +866,7 @@ export default function Home() {
                 >
                   <span className="flex items-center gap-2">
                     <Image
-                      src="/icons/settings/iron-chestplate.svg"
+                      src="/icons/settings/iron-chestplate.png"
                       alt="Iron Chestplate"
                       width={20}
                       height={20}
