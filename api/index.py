@@ -476,7 +476,6 @@ def get_leaderboard(
     custom_time_hours: float = Query(24.0, gt=0.0),
     harvest_harbinger: bool = Query(False),
     infini_vacuum: bool = Query(False),
-    dark_cacao: bool = Query(False),
     harvest_boost: bool = Query(False),
     improved_harvest_boost: bool = Query(True),
     hypercharge_level: int | None = Query(None, ge=0, le=20),
@@ -556,10 +555,10 @@ def get_leaderboard(
     
     # Buff fortune model:
     # Harvest Harbinger (+50) is unaffected by Hypercharge.
-    # InfiniVacuum (+200) and Dark Cacao (+30) are affected by Hypercharge.
+    # InfiniVacuum (+200) is affected by Hypercharge.
     affected_multiplier = 1.0 + (hypercharge_level * HYPERCHARGE_BONUS_PER_LEVEL[hypercharge_rarity])
     unaffected_bonus = 50.0 if harvest_harbinger else 0.0
-    affected_bonus_base = (200.0 if infini_vacuum else 0.0) + (30.0 if dark_cacao else 0.0)
+    affected_bonus_base = 200.0 if infini_vacuum else 0.0
     total_bonus = unaffected_bonus + (affected_bonus_base * affected_multiplier)
     effective_fortune = fortune + total_bonus
     overdrive_bonus = overdrive_chip_level * OVERDRIVE_BONUS_PER_LEVEL[overdrive_chip_rarity]
@@ -810,7 +809,6 @@ def get_leaderboard(
                 "bonus_total": total_bonus,
                 "harvest_harbinger": harvest_harbinger,
                 "infini_vacuum": infini_vacuum,
-                "dark_cacao": dark_cacao,
                 "hypercharge_level": hypercharge_level,
                 "hypercharge_rarity": hypercharge_rarity,
                 "affected_multiplier": affected_multiplier,

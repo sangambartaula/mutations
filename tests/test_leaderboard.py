@@ -23,14 +23,13 @@ class LeaderboardTests(unittest.TestCase):
             maxed_crops="",
             harvest_harbinger=True,
             infini_vacuum=True,
-            dark_cacao=True,
             hypercharge_level=20,
         )
 
         breakdown = result["metadata"]["fortune_breakdown"]
         self.assertEqual(breakdown["base_fortune"], 100)
-        self.assertEqual(breakdown["bonus_total"], 510)
-        self.assertEqual(breakdown["effective_fortune"], 610)
+        self.assertEqual(breakdown["bonus_total"], 450)
+        self.assertEqual(breakdown["effective_fortune"], 550)
 
     @patch("api.index.get_bazaar_prices", return_value={})
     def test_split_greenhouse_and_evergreen_controls_affect_backend_math(self, _mock_prices):
@@ -92,7 +91,6 @@ class LeaderboardTests(unittest.TestCase):
             unique_crops=12,
             harvest_harbinger=False,
             infini_vacuum=True,
-            dark_cacao=False,
             hypercharge_level=10,
             hypercharge_rarity="rare",
             evergreen_chip_level=10,
@@ -111,7 +109,6 @@ class LeaderboardTests(unittest.TestCase):
             unique_crops=12,
             harvest_harbinger=False,
             infini_vacuum=True,
-            dark_cacao=False,
             hypercharge_level=10,
             hypercharge_rarity="legendary",
             evergreen_chip_level=10,

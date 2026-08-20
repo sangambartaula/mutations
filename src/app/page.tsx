@@ -90,7 +90,6 @@ type LeaderboardResponse = {
       bonus_total: number;
       harvest_harbinger: boolean;
       infini_vacuum: boolean;
-      dark_cacao: boolean;
       hypercharge_level: number;
       hypercharge_rarity: ChipRarity;
       affected_multiplier: number;
@@ -247,7 +246,6 @@ export default function Home() {
   const [useImprovedHarvestBoost, setUseImprovedHarvestBoost] = useState(true);
   const [useHarvestHarbinger, setUseHarvestHarbinger] = useState(false);
   const [useInfiniVacuum, setUseInfiniVacuum] = useState(false);
-  const [useDarkCacao, setUseDarkCacao] = useState(false);
   const [hyperchargeLevel, setHyperchargeLevel] = useState(0);
   const [hyperchargeRarity, setHyperchargeRarity] = useState<ChipRarity>("legendary");
   const [ghYieldUpgrade, setGhYieldUpgrade] = useState(9);
@@ -329,7 +327,6 @@ export default function Home() {
         if (typeof parsed.useImprovedHarvestBoost === "boolean") setUseImprovedHarvestBoost(parsed.useImprovedHarvestBoost);
         if (typeof parsed.useHarvestHarbinger === "boolean") setUseHarvestHarbinger(parsed.useHarvestHarbinger);
         if (typeof parsed.useInfiniVacuum === "boolean") setUseInfiniVacuum(parsed.useInfiniVacuum);
-        if (typeof parsed.useDarkCacao === "boolean") setUseDarkCacao(parsed.useDarkCacao);
         const parsedHyperchargeRarity = asChipRarity(parsed.hyperchargeRarity);
         setHyperchargeRarity(parsedHyperchargeRarity);
         if (typeof parsed.hyperchargeLevel === "number") {
@@ -372,7 +369,6 @@ export default function Home() {
         useImprovedHarvestBoost,
         useHarvestHarbinger,
         useInfiniVacuum,
-        useDarkCacao,
         hyperchargeLevel,
         hyperchargeRarity,
         ghYieldUpgrade,
@@ -397,7 +393,6 @@ export default function Home() {
     useImprovedHarvestBoost,
     useHarvestHarbinger,
     useInfiniVacuum,
-    useDarkCacao,
     hyperchargeLevel,
     hyperchargeRarity,
     ghYieldUpgrade,
@@ -451,7 +446,6 @@ export default function Home() {
       improved_harvest_boost: useImprovedHarvestBoost ? "true" : "false",
       harvest_harbinger: useHarvestHarbinger ? "true" : "false",
       infini_vacuum: useInfiniVacuum ? "true" : "false",
-      dark_cacao: useDarkCacao ? "true" : "false",
       hypercharge_level: hyperchargeLevel.toString(),
       hypercharge_rarity: hyperchargeRarity,
       gh_yield_upgrade: ghYieldUpgrade.toString(),
@@ -510,7 +504,6 @@ export default function Home() {
     useImprovedHarvestBoost,
     useHarvestHarbinger,
     useInfiniVacuum,
-    useDarkCacao,
     hyperchargeLevel,
     hyperchargeRarity,
     ghYieldUpgrade,
@@ -1102,14 +1095,6 @@ export default function Home() {
                       Pest Buff (+200)
                     </span>
                     <input type="checkbox" checked={useInfiniVacuum} onChange={(e) => setUseInfiniVacuum(e.target.checked)} className="accent-amber-500" />
-                  </label>
-
-                  <label className="flex items-center justify-between gap-3">
-                    <span className="inline-flex items-center gap-2 text-xs">
-                      <Image src="/icons/buffs/refined-dark-cacao-truffle.png" alt="Refined Dark Cacao Truffle" width={20} height={20} className="w-5 h-5 rounded-sm" />
-                      Refined Dark Cacao Truffle (+30, affected)
-                    </span>
-                    <input type="checkbox" checked={useDarkCacao} onChange={(e) => setUseDarkCacao(e.target.checked)} className="accent-amber-500" />
                   </label>
 
                   <div>
