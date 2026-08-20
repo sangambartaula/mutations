@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { Fragment, useState, useEffect, useMemo, useRef } from "react";
 import { ModeToggle } from "@/components/mode-toggle";
@@ -144,7 +144,6 @@ const cropLabelMap: Record<string, string> = {
 
 const toCropLabel = (crop: string) => cropLabelMap[crop] ?? crop;
 const toMutationLabel = (mutation: string) => {
-  if (mutation === "TURTLELLINI") return "Turtlellini";
   if (mutation === "Plant Boy Advance") return "PlantBoy Advance";
   return mutation;
 };
@@ -734,8 +733,8 @@ export default function Home() {
   });
 
   const sortIndicator = (key: SortKey) => {
-    if (sortKey !== key) return "↕";
-    return sortDirection === "asc" ? "↑" : "↓";
+    if (sortKey !== key) return "?";
+    return sortDirection === "asc" ? "?" : "?";
   };
 
   const scrollLeaderboardBy = (pixels: number) => {
@@ -1242,7 +1241,7 @@ export default function Home() {
                       }`}
                       aria-hidden="true"
                     >
-                      ✓
+                      ?
                     </span>
                   </button>
                 ))}
@@ -1263,8 +1262,8 @@ export default function Home() {
               <div className="flex items-center gap-2">
                 {mode === "smart" && visibleSmartCrops.length > 6 && (
                   <>
-                    <button type="button" onClick={() => scrollLeaderboardBy(-420)} className="px-2 py-1 text-xs rounded border border-neutral-300 dark:border-neutral-700">←</button>
-                    <button type="button" onClick={() => scrollLeaderboardBy(420)} className="px-2 py-1 text-xs rounded border border-neutral-300 dark:border-neutral-700">→</button>
+                    <button type="button" onClick={() => scrollLeaderboardBy(-420)} className="px-2 py-1 text-xs rounded border border-neutral-300 dark:border-neutral-700">?</button>
+                    <button type="button" onClick={() => scrollLeaderboardBy(420)} className="px-2 py-1 text-xs rounded border border-neutral-300 dark:border-neutral-700">?</button>
                   </>
                 )}
                 {loading && <Loader2 className="w-5 h-5 animate-spin text-emerald-500" />}
@@ -1753,7 +1752,7 @@ export default function Home() {
                                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
                                       {getYieldCalculationSteps(yld).map((step, index) => (
                                         <Fragment key={`${yld.name}-${step.label}`}>
-                                          {index > 0 && <span className="text-xs font-black text-neutral-500">×</span>}
+                                          {index > 0 && <span className="text-xs font-black text-neutral-500">�</span>}
                                           <div className={`rounded-lg border px-2 py-1.5 ${getCalculationToneClasses(step.tone)}`}>
                                             <div className="flex flex-wrap items-center gap-1 whitespace-normal">
                                               <p className="text-[9px] font-semibold uppercase tracking-[0.12em] opacity-70">{step.label}</p>

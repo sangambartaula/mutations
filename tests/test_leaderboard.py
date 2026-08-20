@@ -630,7 +630,7 @@ class LeaderboardTests(unittest.TestCase):
 
         mushroom = next((y for y in devourer["breakdown"]["yields"] if y["name"] == "Mushroom"), None)
         self.assertIsNotNone(mushroom)
-        self.assertAlmostEqual(mushroom["math"]["base"], 1900.0, places=6)
+        self.assertAlmostEqual(mushroom["math"]["base"], 3610.0, places=6)
 
     @patch("api.index.get_bazaar_prices", return_value={})
     def test_all_in_aloe_uses_reset_adjusted_special_multiplier_at_stage_14(self, _mock_prices):

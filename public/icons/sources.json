@@ -175,10 +175,10 @@
       "file_title": "Timestalk.png",
       "local_path": "public/icons/mutations/timestalk.png"
     },
-    "TURTLELLINI": {
-      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/a/ac/Turtlellini.png/revision/latest?cb=20251206030426",
-      "file_title": "Turtlellini.png",
-      "local_path": "public/icons/mutations/turtlellini.png"
+    "Turtellini": {
+      "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/a/ac/Turtellini.png/revision/latest?cb=20251206030426",
+      "file_title": "Turtellini.png",
+      "local_path": "public/icons/mutations/turtellini.png"
     },
     "Veilshroom": {
       "source_url": "https://static.wikia.nocookie.net/hypixel-skyblock/images/3/31/Veilshroom.png/revision/latest?cb=20251206022140",

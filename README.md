@@ -196,16 +196,3 @@ npm run lint
 npm run build
 python -m pytest tests/test_leaderboard.py tests/test_leaderboard_integration.py tests/test_mut_calc.py
 ```
-
-## Why This Project Belongs On a Resume
-
-This project demonstrates more than just UI work or scripting. It combines:
-
-- full-stack application development across TypeScript and Python
-- probability-based modeling and expected-value calculations
-- live external data integration
-- domain-specific edge-case handling
-- explainable UI for complex calculations
-- backend performance and public API hardening
-
-It is a good example of building a polished product around ambiguous real-world rules, then making the assumptions visible enough that users can trust the result.

@@ -228,7 +228,7 @@
     "count": 84,
     "ingredients": {
       "Blastberry": 16,
-      "TURTLELLINI": 84
+      "Turtellini": 84
     },
     "growth_stages": 1
   },
@@ -292,7 +292,7 @@
     },
     "growth_stages": 14
   },
-  "TURTLELLINI": {
+  "Turtellini": {
     "count": 16,
     "ingredients": {
       "Choconut": 42,
