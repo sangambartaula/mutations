@@ -281,7 +281,7 @@ export default function Home() {
     { key: "Sugar cane", label: "Sugar Cane" },
     { key: "Melon", label: "Melon" },
     { key: "Cactus", label: "Cactus" },
-    { key: "Coco Bean", label: "Cocoa Beans" },
+    { key: "Cocoa Beans", label: "Cocoa Beans" },
     { key: "Nether Wart", label: "Nether Wart" },
     { key: "Sunflower", label: "Sunflower" },
     { key: "Moonflower", label: "Moonflower" },
