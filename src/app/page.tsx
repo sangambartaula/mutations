@@ -2,7 +2,7 @@
 
 import { Fragment, useState, useEffect, useMemo, useRef } from "react";
 import { ModeToggle } from "@/components/mode-toggle";
-import { Coins, Sprout, Clock, Calculator, Loader2, ArrowUpRight, AlertTriangle, X, Info, Sparkles, ChevronDown } from "lucide-react";
+import { Coins, Sprout, Clock, Calculator, Loader2, ArrowUpRight, AlertTriangle, X, Info, Sparkles, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import Image from "next/image";
 
 type OptimizationMode = "profit" | "smart" | "target";
@@ -730,9 +730,15 @@ export default function Home() {
     return sortDirection === "asc" ? cmp : -cmp;
   });
 
-  const sortIndicator = (key: SortKey) => {
-    if (sortKey !== key) return "?";
-    return sortDirection === "asc" ? "?" : "?";
+  const renderSortIcon = (key: SortKey) => {
+    if (sortKey !== key) {
+      return <ArrowUpDown className="w-3 h-3 opacity-40 inline-block" />;
+    }
+    return sortDirection === "asc" ? (
+      <ArrowUp className="w-3 h-3 text-emerald-500 inline-block" />
+    ) : (
+      <ArrowDown className="w-3 h-3 text-emerald-500 inline-block" />
+    );
   };
 
   const scrollLeaderboardBy = (pixels: number) => {
@@ -1320,8 +1326,8 @@ export default function Home() {
                     <tr>
                       <th className="px-6 py-4 font-semibold w-16 text-center">Rank</th>
                       <th className="px-6 py-4 font-semibold">
-                        <button type="button" onClick={() => toggleSort("mutation")} className="inline-flex items-center gap-1">
-                          Mutation <span aria-hidden="true">{sortIndicator("mutation")}</span>
+                        <button type="button" onClick={() => toggleSort("mutation")} className="inline-flex items-center gap-1.5 hover:text-neutral-900 dark:hover:text-white transition-colors">
+                          Mutation {renderSortIcon("mutation")}
                         </button>
                       </th>
                       {mode === "smart" ? (
@@ -1332,16 +1338,16 @@ export default function Home() {
                         ))
                       ) : (
                         <th className="px-6 py-4 font-semibold text-right text-emerald-600 dark:text-emerald-400">
-                          <button type="button" onClick={() => toggleSort("value")} className="inline-flex items-center gap-1">
-                            {mode === "profit" ? "Profit / Harvest" : `${targetCrop} Yield`} <span aria-hidden="true">{sortIndicator("value")}</span>
+                          <button type="button" onClick={() => toggleSort("value")} className="inline-flex items-center gap-1.5 hover:opacity-80 transition-opacity">
+                            {mode === "profit" ? "Profit / Harvest" : `${targetCrop} Yield`} {renderSortIcon("value")}
                           </button>
                         </th>
                       )}
                       {mode === "profit" && (
                         <th className="px-6 py-4 font-semibold text-right text-cyan-600 dark:text-cyan-400 hidden lg:table-cell">
                           <div className="inline-flex items-center justify-end gap-2">
-                            <button type="button" onClick={() => toggleSort("profit_per_hour")} className="inline-flex items-center gap-1">
-                              Profit / Hour <span aria-hidden="true">{sortIndicator("profit_per_hour")}</span>
+                            <button type="button" onClick={() => toggleSort("profit_per_hour")} className="inline-flex items-center gap-1.5 hover:opacity-80 transition-opacity">
+                              Profit / Hour {renderSortIcon("profit_per_hour")}
                             </button>
                             <div className="group relative">
                               <button
@@ -1361,15 +1367,15 @@ export default function Home() {
                       )}
                       {mode === "profit" && (
                         <th className="px-6 py-4 font-semibold text-right text-sky-600 dark:text-sky-400 hidden lg:table-cell">
-                          <button type="button" onClick={() => toggleSort("growth_cycle_profit")} className="inline-flex items-center gap-1">
-                            Profit / Growth Cycle <span aria-hidden="true">{sortIndicator("growth_cycle_profit")}</span>
+                          <button type="button" onClick={() => toggleSort("growth_cycle_profit")} className="inline-flex items-center gap-1.5 hover:opacity-80 transition-opacity">
+                            Profit / Growth Cycle {renderSortIcon("growth_cycle_profit")}
                           </button>
                         </th>
                       )}
                       <th className="px-6 py-4 font-semibold text-right hidden md:table-cell">
                         <div className="inline-flex items-center justify-end gap-2">
-                          <button type="button" onClick={() => toggleSort("cycles")} className="inline-flex items-center gap-1">
-                            Growth Cycles <span aria-hidden="true">{sortIndicator("cycles")}</span>
+                          <button type="button" onClick={() => toggleSort("cycles")} className="inline-flex items-center gap-1.5 hover:text-neutral-900 dark:hover:text-white transition-colors">
+                            Growth Cycles {renderSortIcon("cycles")}
                           </button>
                           <div className="group relative">
                             <button
@@ -1388,8 +1394,8 @@ export default function Home() {
                       </th>
                       <th className="px-6 py-4 font-semibold text-right hidden lg:table-cell">
                         <div className="inline-flex items-center justify-end gap-2">
-                          <button type="button" onClick={() => toggleSort("time")} className="inline-flex items-center gap-1">
-                            Time <span aria-hidden="true">{sortIndicator("time")}</span>
+                          <button type="button" onClick={() => toggleSort("time")} className="inline-flex items-center gap-1.5 hover:text-neutral-900 dark:hover:text-white transition-colors">
+                            Time {renderSortIcon("time")}
                           </button>
                           <div className="group relative">
                             <button
@@ -1408,8 +1414,8 @@ export default function Home() {
                       </th>
                       <th className="px-6 py-4 font-semibold text-right hidden sm:table-cell">
                         <div className="inline-flex items-center justify-end gap-2">
-                          <button type="button" onClick={() => toggleSort("setup")} className="inline-flex items-center gap-1">
-                            Setup Cost <span aria-hidden="true">{sortIndicator("setup")}</span>
+                          <button type="button" onClick={() => toggleSort("setup")} className="inline-flex items-center gap-1.5 hover:text-neutral-900 dark:hover:text-white transition-colors">
+                            Setup Cost {renderSortIcon("setup")}
                           </button>
                           <div className="group relative">
                             <button
