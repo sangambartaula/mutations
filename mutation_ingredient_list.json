@@ -254,8 +254,8 @@
   "Startlevine": {
     "count": 16,
     "ingredients": {
-      "Cheesebite": 42,
-      "Blastberry": 24
+      "Blastberry": 42,
+      "Cheesebite": 23
     },
     "growth_stages": 12
   },
